@@ -1,11 +1,11 @@
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
+from chatbot.db.session import async_pool
 from chatbot.graphs.nodes import call_model, call_tool, should_continue
 from chatbot.graphs.state import Context, State
-from chatbot.db.session import async_pool
 from chatbot.settings import S
 
 

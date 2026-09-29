@@ -59,7 +59,9 @@ async def call_model(state: State, config: RunnableConfig, runtime: Runtime):
         model = model.bind_tools(tools)
 
     start_time = time.time()
-    model_response = await model.ainvoke([SystemMessage(content=runtime.context.system_prompt)] + state["messages"], config)
+    model_response = await model.ainvoke(
+        [SystemMessage(content=runtime.context.system_prompt)] + state["messages"], config
+    )
     end_time = time.time()
 
     model_response.response_metadata["elapsed_time"] = round(end_time - start_time, 2)

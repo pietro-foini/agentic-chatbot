@@ -1,8 +1,9 @@
 import uuid
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from chatbot.data import UserResponse, BotResponse, ThinkingStep, Attachment
 from more_itertools import split_before
+
+from chatbot.data import Attachment, BotResponse, ThinkingStep, UserResponse
 
 
 def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | BotResponse]:
@@ -107,7 +108,7 @@ def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage])
             if msg.tool_calls:
                 args = msg.tool_calls[0].get("args", {})
                 tool = msg.tool_calls[0].get("name", "Unknown")
-                elapsed = msg.response_metadata.get('elapsed_time', 0)
+                elapsed = msg.response_metadata.get("elapsed_time", 0)
                 response.thinking.append(ThinkingStep(step_name=f"Tool Call: {tool} ({elapsed}s)", details=args))
             elif msg.content:
                 if isinstance(msg.content, str):
@@ -117,9 +118,9 @@ def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage])
                 elif isinstance(msg.content, list) and isinstance(msg.content[0].get("text"), str):
                     response.content = msg.content[0].get("text", "")
                 elif (
-                        isinstance(msg.content, list)
-                        and isinstance(msg.content[0].get("thinking"), str)
-                        and isinstance(msg.content[1].get("text"), str)
+                    isinstance(msg.content, list)
+                    and isinstance(msg.content[0].get("thinking"), str)
+                    and isinstance(msg.content[1].get("text"), str)
                 ):
                     response.content = msg.content[1].get("text", "")
                     response.thinking.append(
@@ -129,7 +130,7 @@ def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage])
                     response.content = ""
 
                 if is_tool_used:
-                    elapsed = msg.response_metadata.get('elapsed_time', 0)
+                    elapsed = msg.response_metadata.get("elapsed_time", 0)
                     response.thinking.append(
                         ThinkingStep(step_name=f"AI Response ({elapsed}s)", details=f"{str(response.content)[:10]}...")
                     )

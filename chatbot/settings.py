@@ -53,5 +53,4 @@ class Settings(BaseSettings):
     )
 
 
-
 S = Settings()  # type: ignore[call-arg]

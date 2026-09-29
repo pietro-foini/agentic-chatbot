@@ -2,7 +2,6 @@ from datetime import datetime
 
 from langchain_core.prompts import PromptTemplate
 
-
 SYSTEM_PROMPT = PromptTemplate.from_template(
     template="""
     Today's date: {date}.
