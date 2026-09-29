@@ -1,23 +1,24 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 
-from chatbot.data import UserResponse, Attachment
+from chatbot.data import Attachment, UserResponse
 from chatbot.db.session import async_pool
+from chatbot.graphs.agent import GRAPH
+from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
+from chatbot.graphs.tools import download_and_analyze_pdf_from_gcs, retrieve_information_from_source
+
 # from chatbot.llm.ollama import llm
 from chatbot.llm.google import llm
-from chatbot.graphs.prompts import SYSTEM_PROMPT
-from chatbot.graphs.agent import GRAPH
-from chatbot.graphs.tools import retrieve_information_from_source, download_and_analyze_pdf_from_gcs
-from chatbot.utils import extract_bot_response, parse_messages
-from chatbot.storage.config import storage_client
 from chatbot.settings import S
+from chatbot.storage.config import storage_client
+from chatbot.utils import extract_bot_response, parse_messages
 
 chat_router = APIRouter()
 
@@ -150,11 +151,13 @@ async def add_assistant_message(
 
     # Handle optional attachment
     if attachment := user_message.attachment:
-        content.append({
-            "type": "media",
-            "mime_type": attachment.type,
-            "file_uri": attachment.file_uri,
-        })
+        content.append(
+            {
+                "type": "media",
+                "mime_type": attachment.type,
+                "file_uri": attachment.file_uri,
+            }
+        )
         additional_kwargs["file_metadata"] = {
             "id": attachment.id,
             "size": attachment.size,
@@ -168,10 +171,7 @@ async def add_assistant_message(
         additional_kwargs=additional_kwargs,
     )
 
-    inputs = {
-        "messages": [message],
-        "user_preferences": {"style": "technical", "verbosity": "detailed"}
-    }
+    inputs = {"messages": [message], "user_preferences": {"style": "technical", "verbosity": "detailed"}}
 
     # Get assistant answer.
     response = await GRAPH.ainvoke(
