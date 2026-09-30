@@ -13,9 +13,7 @@ from chatbot.graphs.agent import GRAPH
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.graphs.tools import download_and_analyze_pdf_from_gcs, retrieve_information_from_source
-
-# from chatbot.llm.ollama import llm
-from chatbot.llm.google import llm
+from chatbot.llm.ollama import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_bot_response, parse_messages
@@ -45,6 +43,7 @@ async def delete_chats():
 
     response = HTMLResponse()
     response.headers["HX-Redirect"] = "/"
+
     return response
 
 

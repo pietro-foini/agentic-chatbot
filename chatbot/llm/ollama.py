@@ -3,6 +3,6 @@ from langchain_ollama import ChatOllama
 from chatbot.settings import S
 
 llm = ChatOllama(
-    model="llama3.1",
+    model="qwen2.5:7b",
     temperature=S.TEMPERATURE,
 )
