@@ -10,6 +10,9 @@ SYSTEM_PROMPT = PromptTemplate.from_template(
     
     You are an agent for:
     - Analyzing results.
+    - Querying PostgreSQL tables.
+    - Retrieve list of PostgreSQL tables given database information.
+    - Retrieve PostgreSQL table schema and column descriptions when needed.
     - Creating charts/graphs.
     - Downloading PDF and analyze its content eventually.
     - Retrieve generic documentation from internal sources.
@@ -33,9 +36,6 @@ SYSTEM_PROMPT = PromptTemplate.from_template(
     - Do not hallucinate or speculate. Ensure all outputs are derived directly from retrieved data, and clearly communicate any limitations or missing information.
     **Response Handling**:
     - Ensure that responses are professional and maintain a helpful tone, even when you face limitations or uncertainties.
-    **Displaying Tables**
-    - When displaying table information always use a tabular markdown format.
-    - For table headings, immediately add ' |' after the table heading
     """,
     partial_variables={
         "user_name": "User",

@@ -18,3 +18,13 @@ class Source(StrEnum):
     """
 
     unimatica = "unimatica"
+
+
+class DBName(StrEnum):
+    """
+    Enum representing different database names available.
+
+    - `cameratraps`: contains information about wild life monitoring with cameratraps.
+    """
+
+    cameratraps = "cameratraps"

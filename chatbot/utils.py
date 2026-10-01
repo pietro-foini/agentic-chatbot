@@ -94,7 +94,7 @@ def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage])
             elapsed = msg.response_metadata.get("elapsed_time", 0)
             response.thinking.append(ThinkingStep(step_name=f"Tool Response ({elapsed}s)", details=str(msg.content)))
             if msg.artifact and msg.artifact.get("type") == "image":
-                response.image.append(msg.artifact["base64"])
+                response.image = msg.artifact["base64"]
             if msg.artifact and msg.artifact.get("type") == "table":
                 response.table = msg.artifact["base64"]
             if msg.artifact and msg.artifact.get("type") == "pdf":

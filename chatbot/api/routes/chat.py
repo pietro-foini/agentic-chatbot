@@ -4,8 +4,11 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from google.genai.errors import ServerError
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
+from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 
 from chatbot.data import Attachment, UserResponse
@@ -13,7 +16,14 @@ from chatbot.db.session import async_pool
 from chatbot.graphs.agent import GRAPH
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.graphs.tools import download_and_analyze_pdf_from_gcs, retrieve_information_from_source
+from chatbot.graphs.tools import (
+    create_plot,
+    describe_table,
+    download_and_analyze_pdf_from_gcs,
+    execute_sql,
+    list_tables,
+    retrieve_information,
+)
 from chatbot.llm.google import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
@@ -183,27 +193,34 @@ async def add_assistant_message(
             bot_name=S.CHATBOT_NAME,
         ),
         tools=[
-            retrieve_information_from_source,
+            retrieve_information,
             download_and_analyze_pdf_from_gcs,
+            execute_sql,
+            list_tables,
+            describe_table,
+            create_plot,
         ],
         vector_store=request.app.state.vector_store,
     )
 
     # Initial graph execution.
-    response = await GRAPH.ainvoke(
-        inputs,
-        stream_mode="values",
-        config=thread_config,
-        context=context_obj,
-    )
+    try:
+        response = await GRAPH.ainvoke(
+            inputs,
+            stream_mode="values",
+            config=thread_config,
+            context=context_obj,
+        )
+    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError) as e:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/error_message.html",
+        )
 
     # Check graph state if stopped for interrupt.
     state_snapshot = await GRAPH.aget_state(thread_config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
-
-        print(pending_interrupt)
-
         return templates.TemplateResponse(
             request=request,
             name="partials/approval_request.html",
@@ -251,8 +268,12 @@ async def resume_chat(
             bot_name=S.CHATBOT_NAME,
         ),
         tools=[
-            retrieve_information_from_source,
+            retrieve_information,
             download_and_analyze_pdf_from_gcs,
+            execute_sql,
+            list_tables,
+            describe_table,
+            create_plot,
         ],
         vector_store=request.app.state.vector_store,
     )
@@ -262,11 +283,17 @@ async def resume_chat(
         resume_payload["reason"] = reason
 
     # Resume graph execution.
-    response = await GRAPH.ainvoke(
-        Command(resume=resume_payload),
-        config=thread_config,
-        context=context_obj,
-    )
+    try:
+        response = await GRAPH.ainvoke(
+            Command(resume=resume_payload),
+            config=thread_config,
+            context=context_obj,
+        )
+    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError) as e:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/error_message.html",
+        )
 
     messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)

@@ -48,8 +48,8 @@ class BotResponse(BaseResponse):
 
     type: Literal[Type.ai] = Type.ai
 
-    table: list[dict] | None = None
-    image: list[str] = Field(default_factory=list)
     pdf: str | None = None
+    table: str | None = None
+    image: str | None = None
     thinking: list[ThinkingStep] = Field(default_factory=list)
     response_time: float = 0.0

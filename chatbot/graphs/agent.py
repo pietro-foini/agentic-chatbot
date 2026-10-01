@@ -1,6 +1,7 @@
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.store.memory import InMemoryStore
 from langgraph.types import RetryPolicy
 
 from chatbot.db.session import async_pool
@@ -11,6 +12,9 @@ from chatbot.settings import S
 
 def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
     """Construct and compile the agent graph."""
+
+    # Create store for RAM purposes (for tools information at the moment).
+    store = InMemoryStore()
 
     # Define a new graph with state
     workflow = StateGraph(state_schema=State, context_schema=Context)
@@ -31,7 +35,7 @@ def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
         },
     )
 
-    return workflow.compile(name="agent", checkpointer=checkpointer)
+    return workflow.compile(name="agent", checkpointer=checkpointer, store=store)
 
 
 postgres_checkpointer = AsyncPostgresSaver(async_pool)
