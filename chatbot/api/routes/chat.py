@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
 from chatbot.data import Attachment, UserResponse
 from chatbot.db.session import async_pool
@@ -13,7 +14,7 @@ from chatbot.graphs.agent import GRAPH
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.graphs.tools import download_and_analyze_pdf_from_gcs, retrieve_information_from_source
-from chatbot.llm.ollama import llm
+from chatbot.llm.google import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_bot_response, parse_messages
@@ -172,33 +173,105 @@ async def add_assistant_message(
 
     inputs = {"messages": [message], "user_preferences": {"style": "technical", "verbosity": "detailed"}}
 
-    # Get assistant answer.
+    thread_config = RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT)
+
+    context_obj = Context(
+        chatbot_name=S.CHATBOT_NAME,
+        model=llm,
+        system_prompt=SYSTEM_PROMPT.format(
+            user_name="Pietro",
+            bot_name=S.CHATBOT_NAME,
+        ),
+        tools=[
+            retrieve_information_from_source,
+            download_and_analyze_pdf_from_gcs,
+        ],
+        vector_store=request.app.state.vector_store,
+    )
+
+    # Initial graph execution.
     response = await GRAPH.ainvoke(
         inputs,
         stream_mode="values",
-        config=RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT),
-        context=Context(
-            chatbot_name=S.CHATBOT_NAME,
-            model=llm,
-            system_prompt=SYSTEM_PROMPT.format(
-                user_name="Pietro",
-                bot_name=S.CHATBOT_NAME,
-            ),
-            tools=[
-                retrieve_information_from_source,
-                download_and_analyze_pdf_from_gcs,
-            ],
-            vector_store=request.app.state.vector_store,
-        ),
+        config=thread_config,
+        context=context_obj,
     )
 
-    messages = response["messages"]
+    # Check graph state if stopped for interrupt.
+    state_snapshot = await GRAPH.aget_state(thread_config)
+    if state_snapshot.next:
+        pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
 
-    # Retrieve the last user/assistant block.
+        print(pending_interrupt)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/approval_request.html",
+            context={
+                "thread_id": thread_id,
+                "approval_info": pending_interrupt,
+            },
+        )
+
+    # If not interrupt, continue the execution.
+    messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
     messages = messages[start_idx:]
 
-    # Create assistant response for rendering purposes.
+    assistant_message = extract_bot_response(messages)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/assistant_message.html",
+        context={"response": assistant_message},
+    )
+
+
+@chat_router.post(path="/chat/{thread_id}/resume", response_class=HTMLResponse)
+async def resume_chat(
+    request: Request,
+    thread_id: str,
+    approved: str = Form(...),
+    reason: str | None = Form(None),
+):
+    """Resume a paused agent thread based on human feedback."""
+
+    is_approved = approved.lower() == "true"
+
+    thread_config = RunnableConfig(
+        configurable={"thread_id": thread_id},
+        recursion_limit=S.RECURSION_LIMIT,
+    )
+
+    context_obj = Context(
+        chatbot_name=S.CHATBOT_NAME,
+        model=llm,
+        system_prompt=SYSTEM_PROMPT.format(
+            user_name="Pietro",
+            bot_name=S.CHATBOT_NAME,
+        ),
+        tools=[
+            retrieve_information_from_source,
+            download_and_analyze_pdf_from_gcs,
+        ],
+        vector_store=request.app.state.vector_store,
+    )
+
+    resume_payload = {"approved": is_approved}
+    if not is_approved and reason:
+        resume_payload["reason"] = reason
+
+    # Resume graph execution.
+    response = await GRAPH.ainvoke(
+        Command(resume=resume_payload),
+        config=thread_config,
+        context=context_obj,
+    )
+
+    messages = response["messages"]
+    start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
+    messages = messages[start_idx:]
+
     assistant_message = extract_bot_response(messages)
 
     return templates.TemplateResponse(

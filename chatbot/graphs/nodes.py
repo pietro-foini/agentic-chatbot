@@ -6,18 +6,47 @@ from langchain.tools import ToolRuntime
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.runtime import Runtime
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 
 from chatbot.graphs.state import State
 
+SENSITIVE_TOOLS = {"download_and_analyze_pdf_from_gcs"}
+
 
 async def call_tool(state: State, config: RunnableConfig, runtime: Runtime):
-    """Handles agent reasoning and potentially emits tool calls"""
+    """Handles tool calls with a Human-in-the-Loop Guardrail check."""
 
     tools_by_name = {tool.name: tool for tool in runtime.context.tools}
+    last_message = state["messages"][-1]
+
+    tool_calls = last_message.tool_calls
+
+    sensitive_calls = [tc for tc in tool_calls if tc["name"] in SENSITIVE_TOOLS]
+
+    if sensitive_calls:
+        tool_names = ", ".join(tc["name"] for tc in sensitive_calls)
+        review_request = {
+            "action": "human_approval_required",
+            "sensitive_tool_calls": sensitive_calls,
+            "message": f"The assistant requires authorization to run: {tool_names}.",
+        }
+        human_decision = interrupt(review_request)
+
+        if not human_decision.get("approved", False):
+            rejection_reason = human_decision.get("reason", "Action rejected by user.")
+            rejection_outputs = [
+                ToolMessage(
+                    content=f"Action canceled by user: {rejection_reason}",
+                    name=tc["name"],
+                    status="error",
+                    tool_call_id=tc["id"],
+                )
+                for tc in tool_calls
+            ]
+            return Command(update={"messages": rejection_outputs})
 
     outputs = []
-    for tool_call in state["messages"][-1].tool_calls:
+    for tool_call in tool_calls:
         tool = tools_by_name[tool_call["name"]]
         tool_args = tool_call["args"]
 

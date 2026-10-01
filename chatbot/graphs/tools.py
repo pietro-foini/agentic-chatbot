@@ -69,7 +69,7 @@ async def retrieve_information_from_source(query: str, source: Source, runtime: 
     Retrieve relevant information from a knowledge source using a RAG (Retrieval-Augmented Generation) approach.
     This tool searches a vector store to find content related to a user query. Currently, the supported sources are:
 
-    - `unimatica`: contains information about italian CCNL unimatica contract.
+    - `unimatica`: contains information about italian CCNL Unimatica contract.
 
     :param query: the query to use for retrieving information from documentation
     :type query: str
