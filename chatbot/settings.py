@@ -49,6 +49,18 @@ class Settings(BaseSettings):
         default=3,
         description="Maximum retries if an agent node fails during execution",
     )
+    SQL_STATEMENT_TIMEOUT_MS: int = Field(
+        default=8000,
+        description="PostgreSQL statement_timeout applied to agent SQL connections, in milliseconds",
+    )
+    SQL_RESULT_LIMIT: int = Field(
+        default=100,
+        description="Maximum number of rows returned by agent SQL queries",
+    )
+    PLOT_EXEC_TIMEOUT_SECONDS: int = Field(
+        default=8,
+        description="Maximum seconds allowed for generated plot code to run",
+    )
 
 
 S = Settings()  # type: ignore[call-arg]

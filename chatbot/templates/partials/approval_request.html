@@ -28,6 +28,25 @@
             {{ approval_info.message or "The assistant requires your permission to perform this sensitive action." }}
         </p>
 
+        {% if approval_info.sensitive_tool_calls %}
+        <ul class="mb-4 space-y-2 w-full">
+            {% for call in approval_info.sensitive_tool_calls %}
+            <li class="rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-800 px-3 py-2">
+                <p class="text-xs font-semibold text-neutral-800 dark:text-neutral-200">{{ call.name }}</p>
+                {% if call.args %}
+                <pre class="mt-1 text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap break-all">{{ call.args }}</pre>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if approval_info.safe_tool_names %}
+        <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mb-4">
+            If you decline, these other tools will still run: {{ approval_info.safe_tool_names | join(", ") }}.
+        </p>
+        {% endif %}
+
         <div class="flex items-center justify-between w-full pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
             <div class="flex items-center gap-2">
                 <button

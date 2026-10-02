@@ -1,7 +1,8 @@
 import base64
 import json
 import re
-import urllib
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from io import BytesIO
 from pathlib import Path
 
@@ -13,8 +14,8 @@ import seaborn as sns
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
 
+from chatbot.db.session import create_readonly_async_engine
 from chatbot.graphs.data import DBName, OutputTool, Source
 from chatbot.graphs.models import (
     CodePlotInput,
@@ -24,6 +25,7 @@ from chatbot.graphs.models import (
     RAGInput,
     SQLQueryInput,
 )
+from chatbot.graphs.security import validate_plot_code
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 
@@ -41,10 +43,9 @@ async def list_tables(db_name: DBName, runtime: ToolRuntime) -> OutputTool:
     :rtype: OutputTool
     """
 
+    engine = None
     try:
-        db_uri = f"postgresql+asyncpg://{S.DB_USER}:{urllib.parse.quote_plus(S.DB_PASSWORD)}@{S.DB_HOST}:{S.DB_PORT}/{db_name}"
-        engine = create_async_engine(db_uri)
-
+        engine = create_readonly_async_engine(str(db_name))
         query = """
             SELECT table_name 
             FROM information_schema.tables 
@@ -54,10 +55,12 @@ async def list_tables(db_name: DBName, runtime: ToolRuntime) -> OutputTool:
             result = await conn.execute(text(query))
             tables = [row[0] for row in result.fetchall()]
 
-        await engine.dispose()
         return OutputTool(status="success", content=json.dumps(tables))
     except Exception as e:
         return OutputTool(status="error", content=f"Error retrieving tables: {e}")
+    finally:
+        if engine is not None:
+            await engine.dispose()
 
 
 @tool("describe_table", args_schema=DescribeTableInput, response_format="content")
@@ -75,10 +78,9 @@ async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime)
     :rtype: OutputTool
     """
 
+    engine = None
     try:
-        db_uri = f"postgresql+asyncpg://{S.DB_USER}:{urllib.parse.quote_plus(S.DB_PASSWORD)}@{S.DB_HOST}:{S.DB_PORT}/{db_name}"
-        engine = create_async_engine(db_uri)
-
+        engine = create_readonly_async_engine(str(db_name))
         query = """
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
@@ -88,10 +90,12 @@ async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime)
             result = await conn.execute(text(query), {"table_name": table_name})
             columns = [dict(row._mapping) for row in result.fetchall()]
 
-        await engine.dispose()
         return OutputTool(status="success", content=json.dumps(columns))
     except Exception as e:
         return OutputTool(status="error", content=f"Error retrieving schema: {e}")
+    finally:
+        if engine is not None:
+            await engine.dispose()
 
 
 @tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content")
@@ -111,12 +115,10 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     :rtype: OutputTool
     """
 
+    engine = None
     try:
-        db_uri = f"postgresql+asyncpg://{S.DB_USER}:{urllib.parse.quote_plus(S.DB_PASSWORD)}@{S.DB_HOST}:{S.DB_PORT}/{db_name}"
-
-        # Execute query.
-        target_engine = create_async_engine(db_uri)
-        async with target_engine.connect() as conn:
+        engine = create_readonly_async_engine(str(db_name))
+        async with engine.connect() as conn:
             result = await conn.execute(text(query))
             rows = [dict(row._mapping) for row in result.fetchall()]
 
@@ -155,6 +157,9 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
             )
     except Exception as e:
         return OutputTool(status="error", content=f"Error executing query: {e}")
+    finally:
+        if engine is not None:
+            await engine.dispose()
 
 
 @tool("create_plot", args_schema=CodePlotInput, response_format="content")
@@ -184,9 +189,10 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
     df = pd.DataFrame(item.value)
 
     try:
-        # Safe built-ins - only allow specific safe functions
+        tree = validate_plot_code(code)
+        compiled = compile(tree, "<plot>", "exec")
+
         safe_builtins = {
-            # Type conversions
             "int": int,
             "float": float,
             "str": str,
@@ -195,7 +201,6 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
             "dict": dict,
             "tuple": tuple,
             "set": set,
-            # Iteration and logic
             "range": range,
             "enumerate": enumerate,
             "zip": zip,
@@ -207,7 +212,6 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
             "reversed": reversed,
             "any": any,
             "all": all,
-            # Other utilities
             "abs": abs,
             "round": round,
         }
@@ -221,20 +225,25 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
             "__builtins__": safe_builtins,
         }
 
-        # Execute the code
-        exec(code, safe_namespace)
+        def _render_plot() -> bytes:
+            exec(compiled, safe_namespace)
+            buf = BytesIO()
+            plt.savefig(buf, format="png", bbox_inches="tight")
+            buf.seek(0)
+            image_bytes = buf.read()
+            buf.close()
+            return image_bytes
 
-        # Capture the current figure to bytes
-        buf = BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight")
-        buf.seek(0)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_render_plot)
+            try:
+                image_bytes = future.result(timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
+            except FuturesTimeout:
+                plt.close("all")
+                return OutputTool(status="error", content="Plot generation timed out")
 
-        # Convert to base64
-        image_base64 = base64.b64encode(buf.read()).decode("utf-8")
-
-        # Close the buffer and clear the figure
-        buf.close()
-        plt.close()
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        plt.close("all")
 
         return OutputTool(
             status="success",
@@ -242,6 +251,7 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
             artifact={"type": "image", "base64": f"data:image/png;base64,{image_base64}"},
         )
     except Exception as e:
+        plt.close("all")
         return OutputTool(status="error", content=f"Error generating plot: {e}")
 
 

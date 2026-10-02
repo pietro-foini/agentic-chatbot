@@ -3,6 +3,8 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 from chatbot.graphs.data import DBName, Source
+from chatbot.graphs.security import validate_plot_code, wrap_sql_with_limit
+from chatbot.settings import S
 
 
 class ListTablesInput(BaseModel):
@@ -34,26 +36,9 @@ class SQLQueryInput(BaseModel):
     @field_validator("query", mode="before")
     @classmethod
     def check_safety(cls, v: str) -> str:
-        """Field validator that ensures the SQL query does not contain forbidden commands"""
+        """Allow only a single read-only SELECT and cap the number of rows."""
 
-        forbidden_keywords = ["DELETE", "INSERT", "UPDATE", "TRUNCATE"]
-
-        pattern = r"\b(" + "|".join(forbidden_keywords) + r")\b"
-
-        if re.search(pattern, v, flags=re.IGNORECASE):
-            raise ValueError(f"Forbidden commands: {forbidden_keywords}")
-
-        return v
-
-    @field_validator("query", mode="after")
-    @classmethod
-    def limit_query(cls, v: str) -> str:
-        """Wrap the query to limit results"""
-
-        original_query = v.strip().rstrip(";")
-        wrapped_query = f"SELECT * FROM ({original_query}) LIMIT 100"
-
-        return wrapped_query
+        return wrap_sql_with_limit(v, limit=S.SQL_RESULT_LIMIT)
 
 
 class CodePlotInput(BaseModel):
@@ -88,10 +73,12 @@ class CodePlotInput(BaseModel):
 
     @field_validator("code", mode="after")
     @classmethod
-    def remove_imports(cls, code: str) -> str:
+    def sanitize_plot_code(cls, code: str) -> str:
         code = re.sub(r"^import\s+.*$", "", code, flags=re.MULTILINE)
         code = re.sub(r"^from\s+.*\s+import\s+.*$", "", code, flags=re.MULTILINE)
-        return code.strip()
+        code = code.strip()
+        validate_plot_code(code)
+        return code
 
 
 class PDFRetrieveInput(BaseModel):
