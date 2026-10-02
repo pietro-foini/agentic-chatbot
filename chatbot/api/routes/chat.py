@@ -105,9 +105,8 @@ async def add_user_message(
         if size_kb > S.MAX_ATTACHMENTS_SIZE:
             return templates.TemplateResponse(
                 request=request,
-                name="partials/message_pair.html",  # TODO: generalizzare la visualizzazione degli errori
-                context={"error": "The maximum allowed file size is 1MB.", "thread_id": thread_id},
-                status_code=400,
+                name="partials/error_message.html",
+                context={"error": "The maximum allowed file size is 1MB."},
             )
 
         # Upload su Google Cloud Storage in order to keep them tracked.
@@ -205,6 +204,7 @@ async def add_assistant_message(
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
+            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
         )
 
     # Check graph state if stopped for interrupt (human-into-the-loop).
@@ -281,6 +281,7 @@ async def resume_chat(
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
+            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
         )
 
     # Check for another interrupt.
