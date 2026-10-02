@@ -18,6 +18,7 @@ langchain-text-splitters = "1.1.2"
 langchain-ollama = "1.1.0"
 langchain-google-genai = "4.4.0"
 langchain-postgres = "0.0.18"
+langchain-aws = "1.8.0"
 langchain = "1.4.2"
 langgraph = "1.2.12"
 langgraph-checkpoint = "4.2.0"
@@ -29,6 +30,7 @@ google-cloud-storage = "3.15.0"
 tiktoken = "0.14.0"
 matplotlib = "3.11.2"
 seaborn = "0.13.2"
+botocore = { extras = ["crt"], version = "*" }
 
 [tool.poetry.group.dev.dependencies]
 isort = "9.0.2"

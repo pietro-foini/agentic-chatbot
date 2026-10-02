@@ -24,10 +24,10 @@ from chatbot.graphs.tools import (
     list_tables,
     retrieve_information,
 )
-from chatbot.llm.google import llm
+from chatbot.llm.ollama import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
-from chatbot.utils import extract_bot_response, parse_messages
+from chatbot.utils import extract_assistant_response, parse_messages
 
 chat_router = APIRouter()
 
@@ -47,10 +47,12 @@ async def new_chat():
 async def delete_chats():
     """Delete all the chat threads"""
 
+    # Delete all the data referring to the persistent memory stored on database.
     async with async_pool.connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("DELETE FROM checkpoint_writes WHERE TRUE;")
-            await cur.execute("DELETE FROM checkpoints WHERE TRUE;")
+            await cur.execute(
+                "TRUNCATE TABLE checkpoints, checkpoint_writes, checkpoint_blobs, checkpoint_migrations RESTART IDENTITY CASCADE;"
+            )
 
     response = HTMLResponse()
     response.headers["HX-Redirect"] = "/"
@@ -60,21 +62,20 @@ async def delete_chats():
 
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def get_chat(request: Request, thread_id: str):
-    """Retrieve the chat history for the given thread_id"""
+    """Retrieve the chat history for the given ID thread"""
 
     # Retrieve messages from graph state of the current thread.
     state = await GRAPH.aget_state({"configurable": {"thread_id": thread_id}})
     messages = state.values.get("messages", []) if state and hasattr(state, "values") else []
 
-    # Parse messages for rendering purposes.
+    # Parse messages for UI rendering purposes.
     parsed_messages = parse_messages(messages)
 
-    # Retrieve the list of all the threads.
+    # Retrieve the list of all the threads in order to visualize them into the chronology.
     async with async_pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute("SELECT DISTINCT thread_id FROM checkpoints;")
             rows = await cur.fetchall()
-            threads = [str(row[0]) for row in rows]
 
     return templates.TemplateResponse(
         request=request,
@@ -82,7 +83,7 @@ async def get_chat(request: Request, thread_id: str):
         context={
             "messages": parsed_messages,
             "thread_id": thread_id,
-            "threads": threads,
+            "threads": [str(row[0]) for row in rows],
         },
     )
 
@@ -94,9 +95,10 @@ async def add_user_message(
     message: str = Form(...),
     file: UploadFile | None = File(None),
 ):
-    """Post a user message to the chat history for the given thread_id"""
+    """Post a user message to the chat history for the given ID thread"""
 
     message = message.strip()
+
     if not message:
         return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
 
@@ -110,17 +112,18 @@ async def add_user_message(
         if size_kb > S.MAX_ATTACHMENTS_SIZE:
             return templates.TemplateResponse(
                 request=request,
-                name="partials/message_pair.html",
+                name="partials/message_pair.html",  # TODO: generalizzare la visualizzazione degli errori
                 context={"error": "The maximum allowed file size is 1MB.", "thread_id": thread_id},
                 status_code=400,
             )
 
-        # Upload su Google Cloud Storage.
+        # Upload su Google Cloud Storage in order to keep them tracked.
         filename = f"{uuid.uuid4()}_{file.filename}"
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
         blob = bucket.blob(f"attachments/{filename}")
         blob.upload_from_string(content_bytes, content_type=mime_type)
 
+        # Create attachment object.
         attachment = Attachment(
             id=filename,
             file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{filename}",
@@ -128,10 +131,10 @@ async def add_user_message(
             size=f"{size_kb}KB",
         )
 
-    # Create user response for rendering purposes.
+    # Create user response.
     user_message = UserResponse(
         id=str(uuid.uuid4()),
-        name="Pietro",
+        name="Pietro",  # TODO: cambialo in modo da personalizzarlo
         content=message,
         attachment=attachment,
     )
@@ -152,15 +155,17 @@ async def add_assistant_message(
     thread_id: str,
     user_message_json: str = Form(...),
 ):
-    """Generate an assistant message for the given thread_id"""
+    """Generate an assistant message for the given ID thread"""
 
+    # Retrieve the user message and validate it.
     user_message = UserResponse.model_validate_json(user_message_json)
 
     content = [{"type": "text", "text": user_message.content}]
     additional_kwargs = {}
 
-    # Handle optional attachment
+    # Handle optional attachment.
     if attachment := user_message.attachment:
+        # Prepare attachment content for LLM (in this case for Gemini). TODO: Generalize?
         content.append(
             {
                 "type": "media",
@@ -189,7 +194,7 @@ async def add_assistant_message(
         chatbot_name=S.CHATBOT_NAME,
         model=llm,
         system_prompt=SYSTEM_PROMPT.format(
-            user_name="Pietro",
+            user_name="Pietro",  # TODO: cambialo in modo da personalizzarlo
             bot_name=S.CHATBOT_NAME,
         ),
         tools=[
@@ -217,7 +222,7 @@ async def add_assistant_message(
             name="partials/error_message.html",
         )
 
-    # Check graph state if stopped for interrupt.
+    # Check graph state if stopped for interrupt (human-into-the-loop).
     state_snapshot = await GRAPH.aget_state(thread_config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
@@ -235,7 +240,8 @@ async def add_assistant_message(
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
     messages = messages[start_idx:]
 
-    assistant_message = extract_bot_response(messages)
+    # Create assistant response.
+    assistant_message = extract_assistant_response(messages)
 
     return templates.TemplateResponse(
         request=request,
@@ -299,7 +305,8 @@ async def resume_chat(
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
     messages = messages[start_idx:]
 
-    assistant_message = extract_bot_response(messages)
+    # Create assistant response.
+    assistant_message = extract_assistant_response(messages)
 
     return templates.TemplateResponse(
         request=request,

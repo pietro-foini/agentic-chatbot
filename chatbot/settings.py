@@ -41,8 +41,6 @@ class Settings(BaseSettings):
         default=720,
         description="Duration (in minutes) a signed Cloud Storage URL remains valid",
     )
-
-    # Graph agent.
     RECURSION_LIMIT: int = Field(
         default=15,
         description="Max recursive steps the agent can perform per request",

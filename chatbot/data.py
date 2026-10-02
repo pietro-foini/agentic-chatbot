@@ -43,7 +43,7 @@ class UserResponse(BaseResponse):
     attachment: Attachment | None = None
 
 
-class BotResponse(BaseResponse):
+class AssistantResponse(BaseResponse):
     """The bot response data structure"""
 
     type: Literal[Type.ai] = Type.ai

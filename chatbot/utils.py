@@ -3,24 +3,24 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from more_itertools import split_before
 
-from chatbot.data import Attachment, BotResponse, ThinkingStep, UserResponse
+from chatbot.data import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
 
-def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | BotResponse]:
+def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
 
     :param messages: the input conversation messages
     :type messages: list[HumanMessage | ToolMessage | AIMessage]
     :return: the parsed conversation messages
-    :rtype: list[UserResponse | BotResponse]
+    :rtype: list[UserResponse | AssistantResponse]
     """
 
     parsed_messages = []
 
     for group in split_before(messages, lambda m: isinstance(m, HumanMessage)):
         user_response = extract_user_response(group)
-        bot_response = extract_bot_response(group)
+        bot_response = extract_assistant_response(group)
         parsed_messages.extend((user_response, bot_response))
 
     return parsed_messages
@@ -75,17 +75,17 @@ def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]
     return response
 
 
-def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> BotResponse:
+def extract_assistant_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> AssistantResponse:
     """
-    Extract the bot response.
+    Extract the assistant response.
 
     :param messages: the input conversation messages
     :type messages: list[HumanMessage | ToolMessage | AIMessage]
-    :return: the bot response
-    :rtype: BotResponse
+    :return: the assistant response
+    :rtype: AssistantResponse
     """
 
-    response = BotResponse(id=str(uuid.uuid4()), name="AI Assistant", content="")
+    response = AssistantResponse(id=str(uuid.uuid4()), name="AI Assistant", content="")
 
     is_tool_used = any(isinstance(msg, ToolMessage) for msg in messages)
 

@@ -31,7 +31,6 @@
         }
     </script>
     <style>
-        /* New messages fade/slide in as htmx appends them. */
         @media (prefers-reduced-motion: no-preference) {
             #chat-messages article, #chat-messages form {
                 transition: opacity 0.2s ease-out, transform 0.2s ease-out;
@@ -41,7 +40,6 @@
                 transform: translateY(4px);
             }
         }
-        /* Hide the empty-state placeholder the moment a real message exists */
         #chat-messages:has(article, form) .empty-state {
             display: none;
         }
@@ -49,9 +47,7 @@
 </head>
 <body class="font-sans bg-white dark:bg-ink text-neutral-900 dark:text-neutral-100 flex h-screen overflow-hidden">
 
-    <!-- SIDEBAR -->
     <aside class="w-64 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col">
-        <!-- New chat button -->
         <div class="p-4 border-b border-neutral-200 dark:border-neutral-800">
             <a href="/" class="flex items-center justify-center gap-2 w-full bg-pine-600 hover:bg-pine-700 text-white font-medium py-2.5 px-4 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
@@ -61,7 +57,6 @@
             </a>
         </div>
 
-        <!-- Conversation list -->
         <div class="flex-1 overflow-y-auto p-4 space-y-1">
             <h3 class="text-xs font-medium text-neutral-400 dark:text-neutral-500 mb-3 px-3">History</h3>
 
@@ -70,7 +65,6 @@
             {% endif %}
 
             {% for thread in threads %}
-                <!-- Highlight the current chat -->
                 <a href="/chat/{{ thread }}"
                    class="block px-3 py-2 text-sm rounded-lg truncate transition-colors {% if thread == thread_id %}bg-neutral-200 dark:bg-neutral-800 font-medium{% else %}hover:bg-neutral-100 dark:hover:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400{% endif %}">
                   Chat {{ thread[:8] }}
@@ -78,12 +72,10 @@
             {% endfor %}
         </div>
 
-        <!-- FOOTER SIDEBAR: Menù a tendina con Ingranaggio (Settings) -->
         <div class="p-3 border-t border-neutral-200 dark:border-neutral-800">
             <details class="relative group/settings">
                 <summary class="flex items-center justify-between w-full p-2.5 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer list-none appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 [&::-webkit-details-marker]:hidden">
                     <div class="flex items-center gap-2.5 text-sm font-medium">
-                        <!-- Icona Ingranaggio -->
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 transition-transform duration-300 group-open/settings:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <circle cx="12" cy="12" r="3" />
@@ -95,7 +87,6 @@
                     </svg>
                 </summary>
 
-                <!-- Menù a comparsa verso l'alto -->
                 <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 z-30">
                     <button
                         hx-delete="/chat"
@@ -112,13 +103,10 @@
         </div>
     </aside>
 
-    <!-- MAIN CHAT AREA -->
     <main class="flex-1 flex flex-col relative h-full">
 
-        <!-- Messages -->
         <div id="chat-messages" class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
 
-            <!-- Empty state -->
             {% if not messages %}
                 <div class="empty-state m-auto text-center max-w-xs">
                     <div class="mx-auto mb-3 w-10 h-10 rounded-full bg-pine-600/10 dark:bg-pine-400/10 flex items-center justify-center">
@@ -131,14 +119,11 @@
                 </div>
             {% endif %}
 
-            <!-- Message History Loop -->
             {% for msg in messages %}
                 {% if msg.type == 'human' %}
-                    <!-- Messaggio Utente -->
                     <article class="w-full max-w-4xl mx-auto flex items-start justify-end gap-3">
                         <div class="group flex flex-col items-end min-w-0 max-w-[min(80%,36rem)]">
 
-                            <!-- Badge file allegato -->
                             {% if msg.attachment %}
                                 <div class="mb-1.5 flex items-center gap-2 bg-pine-700 text-white text-xs px-3 py-1.5 rounded-xl">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -148,7 +133,6 @@
                                 </div>
                             {% endif %}
 
-                            <!-- Testo Messaggio -->
                             {% if msg.content %}
                                 <div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white">{{ msg.content }}</div>
                             {% endif %}
@@ -160,7 +144,6 @@
                             </button>
                         </div>
 
-                        <!-- Avatar Utente con Tooltip Istantaneo all'Hover -->
                         <div class="group/avatar relative shrink-0">
                             <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -171,9 +154,7 @@
                         </div>
                     </article>
                 {% else %}
-                    <!-- Messaggio AI (BotResponse) -->
                     <article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3">
-                        <!-- Avatar Bot con Tooltip Istantaneo all'Hover -->
                         <div class="group/avatar relative shrink-0">
                             <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 cursor-default">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
@@ -184,20 +165,16 @@
                         </div>
 
                         <div class="group flex flex-col items-start min-w-0 max-w-[min(80%,36rem)]">
-                            <!-- Testo Principale -->
                             <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800">{{ msg.content }}</div>
 
-                            <!-- Barra delle Azioni -->
                             <div class="flex items-center gap-4 mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity w-full">
 
-                                <!-- Pulsante Copia -->
                                 <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 focus-visible:outline-none h-6">
                                     <svg class="icon-copy w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5V5.25A1.75 1.75 0 0 1 9.25 3.5h6A1.75 1.75 0 0 1 17 5.25v6A1.75 1.75 0 0 1 15.25 13H13m-8.25 4h6a1.75 1.75 0 0 0 1.75-1.75v-6A1.75 1.75 0 0 0 10.75 7.5h-6A1.75 1.75 0 0 0 3 9.25v6A1.75 1.75 0 0 0 4.75 17Z"/></svg>
                                     <svg class="icon-check w-3.5 h-3.5 hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4 10.5 4 4 8-9"/></svg>
                                     <span class="label">Copy</span>
                                 </button>
 
-                                <!-- Pulsante/Link Download PDF -->
                                 {% if msg.pdf %}
                                 <a
                                   href="{{ msg.pdf }}"
@@ -215,7 +192,6 @@
                                 </a>
                                 {% endif %}
 
-                                <!-- Popover Thinking -->
                                 {% if msg.thinking %}
                                 <details class="group/details relative">
                                     <summary class="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 cursor-pointer list-none appearance-none focus-visible:outline-none h-6 [&::-webkit-details-marker]:hidden">
@@ -224,7 +200,6 @@
                                         <svg class="w-3 h-3 transition-transform duration-200 group-open/details:-rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
                                     </summary>
 
-                                    <!-- Contenuto del Popover -->
                                     <div class="absolute left-0 top-full mt-2 w-[280px] max-h-64 overflow-y-auto z-10 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-lg p-3 flex flex-col gap-3">
                                         {% for step in msg.thinking %}
                                         <div class="border-b border-neutral-100 dark:border-neutral-800 pb-2.5 last:border-0 last:pb-0">
@@ -243,7 +218,6 @@
             {% endfor %}
         </div>
 
-        <!-- Input form -->
         <div class="p-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-ink">
             <form
                 hx-post="/chat/{{ thread_id }}"
@@ -253,7 +227,6 @@
                 onsubmit="handleFormSubmit(this)"
                 class="flex flex-col gap-2 max-w-4xl mx-auto bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-2 pl-4 focus-within:ring-2 focus-within:ring-pine-600 dark:focus-within:ring-pine-400 transition-shadow"
             >
-                <!-- Badge anteprima file selezionato -->
                 <div id="file-preview" class="hidden items-center gap-2 bg-neutral-200 dark:bg-neutral-800 text-xs px-3 py-1.5 rounded-xl w-fit">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-pine-600 dark:text-pine-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -267,10 +240,8 @@
                 </div>
 
                 <div class="flex items-center gap-2 w-full">
-                    <!-- Input File nascosto -->
                     <input type="file" id="file-input" name="file" class="hidden" onchange="updateFilePreview(this)">
 
-                    <!-- Pulsante Graffetta -->
                     <button type="button" onclick="document.getElementById('file-input').click()" aria-label="Attach file" class="shrink-0 text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.55 18.32a1.5 1.5 0 0 1-2.121-2.121l9.9-9.9" />
@@ -352,7 +323,6 @@
             });
         }
 
-        // Chiude qualsiasi tendina (Thinking o Ingranaggio Impostazioni) se si clicca fuori
         document.addEventListener('click', (event) => {
             document.querySelectorAll('details[open]').forEach((details) => {
                 if (!details.contains(event.target)) {
