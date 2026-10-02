@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -16,7 +17,7 @@ from langchain_core.tools import tool
 from sqlalchemy import text
 
 from chatbot.db.session import create_readonly_async_engine
-from chatbot.graphs.data import DBName, OutputTool, Source
+from chatbot.graphs.data import DBName, Source
 from chatbot.graphs.models import (
     CodePlotInput,
     DescribeTableInput,
@@ -31,7 +32,7 @@ from chatbot.storage.config import storage_client
 
 
 @tool("list_tables", args_schema=ListTablesInput, response_format="content")
-async def list_tables(db_name: DBName, runtime: ToolRuntime) -> OutputTool:
+async def list_tables(db_name: DBName, runtime: ToolRuntime) -> str:
     """
     Retrieve a list of all available tables in a specified PostgreSQL database.
 
@@ -39,8 +40,8 @@ async def list_tables(db_name: DBName, runtime: ToolRuntime) -> OutputTool:
     :type db_name: DBName
     :param runtime: the runtime (parameter is not visible to the model)
     :type runtime: ToolRuntime
-    :return: list of table names, status and message
-    :rtype: OutputTool
+    :return: list of table names
+    :rtype: str
     """
 
     engine = None
@@ -55,16 +56,16 @@ async def list_tables(db_name: DBName, runtime: ToolRuntime) -> OutputTool:
             result = await conn.execute(text(query))
             tables = [row[0] for row in result.fetchall()]
 
-        return OutputTool(status="success", content=json.dumps(tables))
+        return json.dumps(tables)
     except Exception as e:
-        return OutputTool(status="error", content=f"Error retrieving tables: {e}")
+        return f"Error retrieving tables: {e}"
     finally:
         if engine is not None:
             await engine.dispose()
 
 
 @tool("describe_table", args_schema=DescribeTableInput, response_format="content")
-async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime) -> OutputTool:
+async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime) -> str:
     """
     Retrieve information about a PostgreSQL table, like information, schema and column details.
 
@@ -74,8 +75,8 @@ async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime)
     :type table_name: str
     :param runtime: the runtime (parameter is not visible to the model)
     :type runtime: ToolRuntime
-    :return: the table information, status and message
-    :rtype: OutputTool
+    :return: the table information
+    :rtype: str
     """
 
     engine = None
@@ -90,16 +91,16 @@ async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime)
             result = await conn.execute(text(query), {"table_name": table_name})
             columns = [dict(row._mapping) for row in result.fetchall()]
 
-        return OutputTool(status="success", content=json.dumps(columns))
+        return json.dumps(columns)
     except Exception as e:
-        return OutputTool(status="error", content=f"Error retrieving schema: {e}")
+        return f"Error retrieving schema: {e}"
     finally:
         if engine is not None:
             await engine.dispose()
 
 
-@tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content")
-async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRuntime) -> OutputTool:
+@tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content_and_artifact")
+async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRuntime) -> tuple[dict | str, Any]:
     """
     Executes a SQL query on PostgreSQL and returns the result as a parsed table.
 
@@ -112,7 +113,7 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     :param runtime: the runtime (parameter is not visible to the model)
     :type runtime: ToolRuntime
     :return: query results as a JSON table, with a table artifact
-    :rtype: OutputTool
+    :rtype: tuple[dict | str, Any]
     """
 
     engine = None
@@ -132,38 +133,36 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
         if len(df) > 20 or len(df.columns) > 10:
             csv_base64 = base64.b64encode(df.to_csv(index=False, encoding="utf-8").encode("utf-8")).decode("utf-8")
 
-            return OutputTool(
-                status="success",
-                content={
-                    "table_name": table_name,
-                    "shape": df.shape,
-                    "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
-                    "data": f"Previewing {min(5, len(df))} rows out of {len(df)} rows: {json.dumps(records[:5])}. "
-                    f"Download to view all data.",
-                    "truncated": True,
-                },
-                artifact={"type": "table", "base64": f"data:text/csv;base64,{csv_base64}"},
-            )
+            content = {
+                "table_name": table_name,
+                "shape": df.shape,
+                "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "data": f"Previewing {min(5, len(df))} rows out of {len(df)} rows: {json.dumps(records[:5])}. "
+                f"Download to view all data.",
+                "truncated": True,
+            }
+            artifact = {"type": "table", "base64": f"data:text/csv;base64,{csv_base64}"}
+
+            return content, artifact
         else:
-            return OutputTool(
-                status="success",
-                content={
-                    "table_name": table_name,
-                    "shape": df.shape,
-                    "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
-                    "data": json.dumps(records),
-                    "truncated": False,
-                },
-            )
+            content = {
+                "table_name": table_name,
+                "shape": df.shape,
+                "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "data": json.dumps(records),
+                "truncated": False,
+            }
+            return content, None
+
     except Exception as e:
-        return OutputTool(status="error", content=f"Error executing query: {e}")
+        return f"Error executing query: {e}", None
     finally:
         if engine is not None:
             await engine.dispose()
 
 
-@tool("create_plot", args_schema=CodePlotInput, response_format="content")
-def create_plot(code: str, description: str, table_name: str, runtime: ToolRuntime) -> OutputTool:
+@tool("create_plot", args_schema=CodePlotInput, response_format="content_and_artifact")
+def create_plot(code: str, description: str, table_name: str, runtime: ToolRuntime) -> tuple[list | str, dict | None]:
     """
     Executes Python code to create a custom seaborn plot and provide an argumentative related description.
 
@@ -176,7 +175,7 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
     :param runtime: the runtime (parameter is not visible to the model)
     :type runtime: ToolRuntime
     :return: graph description, with a Base64 encoded PNG image artifact
-    :rtype: OutputTool
+    :rtype: tuple[list | str, dict | None]
     """
 
     matplotlib.use("Agg")
@@ -184,7 +183,7 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
     item = runtime.store.get(("tables",), table_name)
 
     if item is None:
-        return OutputTool(status="error", content="No data available context to generate a plot.")
+        return "No data available context to generate a plot.", None
 
     df = pd.DataFrame(item.value)
 
@@ -240,30 +239,28 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
                 image_bytes = future.result(timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
             except FuturesTimeout:
                 plt.close("all")
-                return OutputTool(status="error", content="Plot generation timed out")
+                return "Plot generation timed out", None
 
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         plt.close("all")
 
-        return OutputTool(
-            status="success",
-            content=description,
-            artifact={"type": "image", "base64": f"data:image/png;base64,{image_base64}"},
-        )
+        artifact_data = {"type": "image", "base64": f"data:image/png;base64,{image_base64}"}
+
+        return description, artifact_data
     except Exception as e:
         plt.close("all")
-        return OutputTool(status="error", content=f"Error generating plot: {e}")
+        return f"Error generating plot: {e}", None
 
 
-@tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content")
-async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> OutputTool:
+@tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
+async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> tuple[list | str, dict | None]:
     """
     Retrieve, download and analyze a single PDF file from Google Cloud Storage.
 
     :param gcs_uri: Google Cloud Storage URI in format 'gs://bucket-name/path/to/file.pdf'
     :type gcs_uri: str
-    :return: message status, with a Base64 encoded PDF artifact
-    :rtype: OutputTool
+    :return: message, with a Base64 encoded PDF artifact
+    :rtype: tuple[list | str, dict | None]
     """
 
     try:
@@ -272,42 +269,39 @@ async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> OutputTool:
         blob = bucket.get_blob(blob_path)
 
         if not blob.exists():
-            return OutputTool(status="error", content="File not found")
+            return "File not found", None
 
         pdf_bytes = blob.download_as_bytes()
         pdf_base64 = base64.b64encode(pdf_bytes)
         size = round(len(pdf_bytes) / 1024, 2)
 
+        artifact_data = {"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"}
+
         if size > S.MAX_ATTACHMENTS_SIZE:
-            return OutputTool(
-                status="success",
-                content=[
-                    {
-                        "type": "text",
-                        "text": "File successfully downloaded, but it cannot be analyzed because it exceeds size limit",
-                    },
-                ],
-                artifact={"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"},
-            )
+            content = [
+                {
+                    "type": "text",
+                    "text": "File successfully downloaded, but it cannot be analyzed because it exceeds size limit",
+                }
+            ]
+            return content, artifact_data
 
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
         blob = bucket.blob(f"downloads/{Path(blob_path).name}")
         blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
-        return OutputTool(
-            status="success",
-            content=[
-                {"type": "text", "text": "File successfully downloaded"},
-                {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
-            ],
-            artifact={"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"},
-        )
+        content = [
+            {"type": "text", "text": "File successfully downloaded"},
+            {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
+        ]
+        return content, artifact_data
+
     except Exception as e:
-        return OutputTool(status="error", content=f"Error processing file: {e}")
+        return f"Error processing file: {e}", None
 
 
 @tool("retrieve_information", args_schema=RAGInput, response_format="content")
-async def retrieve_information(query: str, source: Source, runtime: ToolRuntime) -> OutputTool:
+async def retrieve_information(query: str, source: Source, runtime: ToolRuntime) -> str:
     """
     Retrieve relevant information from a knowledge source using a RAG (Retrieval-Augmented Generation) approach.
     This tool searches a vector store to find content related to a user query. Currently, the supported sources are:
@@ -321,11 +315,11 @@ async def retrieve_information(query: str, source: Source, runtime: ToolRuntime)
     :param runtime: the runtime (the parameter is not visible to the model)
     :type runtime: ToolRuntime
     :return: the information extracted from the source
-    :rtype: OutputTool
+    :rtype: str
     """
 
     try:
         docs = await runtime.context.vector_store.asimilarity_search(query, filter={"source": {"$eq": source.value}})
-        return OutputTool(status="success", content="\n\n".join([doc.page_content for doc in docs]))
+        return "\n\n".join([doc.page_content for doc in docs])
     except Exception as e:
-        return OutputTool(status="error", content=f"Error retrieving information: {e}")
+        return f"Error retrieving information: {e}"

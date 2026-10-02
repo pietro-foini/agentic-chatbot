@@ -13,17 +13,10 @@ from langgraph.types import Command
 
 from chatbot.data import Attachment, UserResponse
 from chatbot.db.session import async_pool
-from chatbot.graphs.agent import GRAPH
+from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.graphs.tools import (
-    create_plot,
-    describe_table,
-    download_and_analyze_pdf_from_gcs,
-    execute_sql,
-    list_tables,
-    retrieve_information,
-)
+from chatbot.graphs.v2.agent import GRAPH
 from chatbot.llm.google import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
@@ -189,7 +182,6 @@ async def add_assistant_message(
     inputs = {"messages": [message], "user_preferences": {"style": "technical", "verbosity": "detailed"}}
 
     thread_config = RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT)
-
     context_obj = Context(
         chatbot_name=S.CHATBOT_NAME,
         model=llm,
@@ -197,14 +189,7 @@ async def add_assistant_message(
             user_name="Pietro",  # TODO: cambialo in modo da personalizzarlo
             bot_name=S.CHATBOT_NAME,
         ),
-        tools=[
-            retrieve_information,
-            download_and_analyze_pdf_from_gcs,
-            execute_sql,
-            list_tables,
-            describe_table,
-            create_plot,
-        ],
+        tools=ALL_TOOLS,
         vector_store=request.app.state.vector_store,
     )
 
@@ -261,11 +246,7 @@ async def resume_chat(
 
     is_approved = approved.lower() == "true"
 
-    thread_config = RunnableConfig(
-        configurable={"thread_id": thread_id},
-        recursion_limit=S.RECURSION_LIMIT,
-    )
-
+    thread_config = RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT)
     context_obj = Context(
         chatbot_name=S.CHATBOT_NAME,
         model=llm,
@@ -273,20 +254,21 @@ async def resume_chat(
             user_name="Pietro",
             bot_name=S.CHATBOT_NAME,
         ),
-        tools=[
-            retrieve_information,
-            download_and_analyze_pdf_from_gcs,
-            execute_sql,
-            list_tables,
-            describe_table,
-            create_plot,
-        ],
+        tools=ALL_TOOLS,
         vector_store=request.app.state.vector_store,
     )
 
-    resume_payload = {"approved": is_approved}
-    if not is_approved and reason:
-        resume_payload["reason"] = reason
+    if is_approved:
+        decisions = [{"type": "approve"}]
+    else:
+        decisions = [
+            {
+                "type": "reject",
+                "message": reason if reason else "Action rejected by user.",
+            }
+        ]
+
+    resume_payload = {"decisions": decisions}
 
     # Resume graph execution.
     try:
@@ -301,6 +283,20 @@ async def resume_chat(
             name="partials/error_message.html",
         )
 
+    # Check for another interrupt.
+    state_snapshot = await GRAPH.aget_state(thread_config)
+    if state_snapshot.next:
+        pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/approval_request.html",
+            context={
+                "thread_id": thread_id,
+                "approval_info": pending_interrupt,
+            },
+        )
+
+    # If not interrupt, continue the execution.
     messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
     messages = messages[start_idx:]

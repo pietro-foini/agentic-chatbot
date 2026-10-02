@@ -8,7 +8,6 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
-from chatbot.graphs.security import public_tool_call
 from chatbot.graphs.state import State
 
 SENSITIVE_TOOLS = {"download_and_analyze_pdf_from_gcs"}
@@ -45,22 +44,31 @@ async def _run_tool_calls(
         )
 
         start_time = time.time()
-        tool_response = await tool.ainvoke({**tool_call["args"], "runtime": tool_runtime})
+
+        call_payload = {
+            "name": tool_call["name"],
+            "args": {**tool_call["args"], "runtime": tool_runtime},
+            "id": tool_call["id"],
+            "type": "tool_call",
+        }
+
+        tool_message = await tool.ainvoke(call_payload, config=config)
         end_time = time.time()
 
-        outputs.append(
-            ToolMessage(
-                content=tool_response["content"],
+        if not isinstance(tool_message, ToolMessage):
+            tool_message = ToolMessage(
+                content=tool_message,
                 name=tool_call["name"],
-                status=tool_response["status"],
                 tool_call_id=tool_call["id"],
-                artifact=tool_response.get("artifact"),
-                response_metadata={
-                    "elapsed_time": round(end_time - start_time, 2),
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                },
             )
-        )
+
+        tool_message.response_metadata = {
+            **(tool_message.response_metadata or {}),
+            "elapsed_time": round(end_time - start_time, 2),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        outputs.append(tool_message)
 
     return outputs
 
@@ -73,17 +81,43 @@ async def call_tool(state: State, config: RunnableConfig, runtime: Runtime):
     safe_calls = [tc for tc in tool_calls if tc["name"] not in SENSITIVE_TOOLS]
 
     if sensitive_calls:
-        tool_names = ", ".join(tc["name"] for tc in sensitive_calls)
+        action_requests = [
+            {
+                "name": tc["name"],
+                "args": tc["args"],
+                "description": f"Tool execution requires approval\n\nTool: {tc['name']}\nArgs: {tc['args']}",
+            }
+            for tc in sensitive_calls
+        ]
+
+        review_configs = [
+            {
+                "action_name": tc["name"],
+                "allowed_decisions": ["approve", "reject"],
+            }
+            for tc in sensitive_calls
+        ]
+
         review_request = {
-            "action": "human_approval_required",
-            "sensitive_tool_calls": [public_tool_call(tc) for tc in sensitive_calls],
-            "safe_tool_names": [tc["name"] for tc in safe_calls],
-            "message": f"The assistant requires authorization to run: {tool_names}.",
+            "action_requests": action_requests,
+            "review_configs": review_configs,
         }
+
+        # Interrupt execution.
         human_decision = interrupt(review_request)
 
-        if not human_decision.get("approved", False):
-            rejection_reason = human_decision.get("reason", "Action rejected by user.")
+        if isinstance(human_decision, dict) and "decisions" in human_decision:
+            decisions = human_decision["decisions"]
+        elif isinstance(human_decision, list):
+            decisions = human_decision
+        else:
+            decisions = [human_decision]
+
+        decision = decisions[0] if decisions else {}
+        decision_type = decision.get("type") or decision.get("action")
+
+        if decision_type != "approve":
+            rejection_reason = decision.get("message") or "Action rejected by user."
             outputs = [
                 ToolMessage(
                     content=f"Action canceled by user: {rejection_reason}",

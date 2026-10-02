@@ -1,6 +1,5 @@
 import ast
 import re
-from typing import Any
 
 _SQL_COMMENT_BLOCK_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 _SQL_COMMENT_LINE_RE = re.compile(r"--.*?$", re.MULTILINE)
@@ -163,13 +162,3 @@ def validate_plot_code(code: str) -> ast.Module:
                 raise ValueError(f"Call to '{func.attr}' is not allowed in plot code")
 
     return tree
-
-
-def public_tool_call(tool_call: dict[str, Any]) -> dict[str, Any]:
-    """Reduce a tool call to fields that are safe to show in the HITL UI."""
-
-    return {
-        "id": tool_call.get("id"),
-        "name": tool_call.get("name"),
-        "args": dict(tool_call.get("args") or {}),
-    }

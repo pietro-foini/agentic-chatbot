@@ -1,12 +1,11 @@
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import RetryPolicy
 
-from chatbot.db.session import async_pool
-from chatbot.graphs.nodes import call_model, call_tool, should_continue
+from chatbot.graphs.config import postgres_checkpointer
 from chatbot.graphs.state import Context, State
+from chatbot.graphs.v1.nodes import call_model, call_tool, should_continue
 from chatbot.settings import S
 
 
@@ -37,8 +36,6 @@ def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
 
     return workflow.compile(name="agent", checkpointer=checkpointer, store=store)
 
-
-postgres_checkpointer = AsyncPostgresSaver(async_pool)
 
 # Create the graph instance.
 GRAPH = create_agent_graph(max_attempts=S.MAX_ATTEMPTS, checkpointer=postgres_checkpointer)
