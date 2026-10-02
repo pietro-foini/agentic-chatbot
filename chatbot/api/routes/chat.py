@@ -12,7 +12,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 
 from chatbot.data import Attachment, UserResponse
-from chatbot.db.session import async_pool
+from chatbot.db.config import async_pool
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context

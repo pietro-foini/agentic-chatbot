@@ -1,6 +1,6 @@
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from chatbot.db.session import async_pool
+from chatbot.db.config import async_pool
 from chatbot.graphs.tools import (
     create_plot,
     describe_table,

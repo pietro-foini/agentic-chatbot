@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         description="Duration (in minutes) a signed Cloud Storage URL remains valid",
     )
     RECURSION_LIMIT: int = Field(
-        default=15,
+        default=25,
         description="Max recursive steps the agent can perform per request",
     )
     MAX_ATTEMPTS: int = Field(

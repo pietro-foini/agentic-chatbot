@@ -43,6 +43,13 @@
         #chat-messages:has(article, form) .empty-state {
             display: none;
         }
+
+        /* Quando la chat è occupata a generare, disabilita e oscura visivamente il bottone */
+        body.is-generating #submit-btn {
+            opacity: 0.35 !important;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 <body class="font-sans bg-white dark:bg-ink text-neutral-900 dark:text-neutral-100 flex h-screen overflow-hidden">
@@ -220,11 +227,11 @@
 
         <div class="p-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-ink">
             <form
+                id="chat-form"
                 hx-post="/chat/{{ thread_id }}"
                 hx-target="#chat-messages"
                 hx-swap="beforeend"
                 hx-encoding="multipart/form-data"
-                onsubmit="handleFormSubmit(this)"
                 class="flex flex-col gap-2 max-w-4xl mx-auto bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-2 pl-4 focus-within:ring-2 focus-within:ring-pine-600 dark:focus-within:ring-pine-400 transition-shadow"
             >
                 <div id="file-preview" class="hidden items-center gap-2 bg-neutral-200 dark:bg-neutral-800 text-xs px-3 py-1.5 rounded-xl w-fit">
@@ -248,14 +255,16 @@
                         </svg>
                     </button>
 
-                    <input
-                        type="text"
+                    <textarea
+                        id="chat-textarea"
                         name="message"
+                        rows="1"
                         placeholder="Type a message..."
                         autocomplete="off"
-                        class="flex-1 bg-transparent text-sm focus:outline-none"
-                    >
-                    <button type="submit" aria-label="Send message" class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400">
+                        class="flex-1 bg-transparent text-sm focus:outline-none resize-none max-h-36 py-1 overflow-y-auto"
+                    ></textarea>
+
+                    <button type="submit" id="submit-btn" aria-label="Send message" class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
                             <path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.573a.75.75 0 1 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.14v10.64A.75.75 0 0 1 10 17Z" clip-rule="evenodd" />
                         </svg>
@@ -266,6 +275,65 @@
     </main>
 
     <script>
+        const textarea = document.getElementById('chat-textarea');
+        const form = document.getElementById('chat-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const chatContainer = document.getElementById('chat-messages');
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        textarea.addEventListener('input', () => autoResize(textarea));
+
+        textarea.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                if (event.shiftKey) {
+                    setTimeout(() => autoResize(textarea), 0);
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (document.body.classList.contains('is-generating') || submitBtn.disabled) {
+                    return;
+                }
+
+                const fileInput = document.getElementById('file-input');
+                const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+
+                if (textarea.value.trim() !== '' || hasFile) {
+                    submitBtn.click();
+                }
+            }
+        });
+
+        form.addEventListener('submit', () => {
+            document.body.classList.add('is-generating');
+            submitBtn.disabled = true;
+
+            setTimeout(() => {
+                form.reset();
+                clearFileInput();
+                textarea.style.height = 'auto';
+            }, 20);
+        });
+
+        const observer = new MutationObserver(() => {
+            const isAssistantStillLoading = chatContainer.querySelector('form[hx-post*="/assistant"]');
+
+            if (document.body.classList.contains('is-generating') && !isAssistantStillLoading) {
+                document.body.classList.remove('is-generating');
+                submitBtn.disabled = false;
+                textarea.disabled = false;
+                textarea.focus();
+            }
+        });
+
+        observer.observe(chatContainer, { childList: true, subtree: true });
+
+        // Gestione allegati
         function updateFilePreview(input) {
             const preview = document.getElementById('file-preview');
             const nameDisplay = document.getElementById('file-name-display');
@@ -286,13 +354,6 @@
                 preview.classList.add('hidden');
                 preview.classList.remove('flex');
             }
-        }
-
-        function handleFormSubmit(form) {
-            setTimeout(() => {
-                form.reset();
-                clearFileInput();
-            }, 50);
         }
 
         function copyMessage(button) {

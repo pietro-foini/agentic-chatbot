@@ -16,7 +16,7 @@ from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 from sqlalchemy import text
 
-from chatbot.db.session import create_readonly_async_engine
+from chatbot.db.config import create_readonly_async_engine
 from chatbot.graphs.data import DBName, Source
 from chatbot.graphs.models import (
     CodePlotInput,
