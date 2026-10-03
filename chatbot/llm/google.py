@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from chatbot.settings import S
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
+    model=S.MODEL_NAME,
     project=S.PROJECT_ID,
     location=S.REGION,
     vertexai=True,

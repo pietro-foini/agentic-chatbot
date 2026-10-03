@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
     REGION: str = Field(description="The region of the Google Cloud Platform project")
     GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
+    MODEL_NAME: str = Field(description="The name of the LLM model")
 
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")
