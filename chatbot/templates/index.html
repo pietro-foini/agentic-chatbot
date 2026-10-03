@@ -21,10 +21,11 @@
                     colors: {
                         pine: {
                             400: '#2F9E72',
+                            500: '#19875e',
                             600: '#0E6E4E',
                             700: '#0B5940',
                         },
-                        ink: '#16181C',
+                        ink: '#111315',
                     },
                 },
             },
@@ -44,45 +45,87 @@
             display: none;
         }
 
-        /* Quando la chat è occupata a generare, disabilita e oscura visivamente il bottone */
         body.is-generating #submit-btn {
             opacity: 0.35 !important;
             pointer-events: none !important;
             cursor: not-allowed !important;
         }
+
+        .sidebar-collapsed aside {
+            margin-left: -18rem;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sidebar-collapsed #toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            aside {
+                position: fixed;
+                inset-block: 0;
+                left: 0;
+                z-index: 50;
+            }
+            .sidebar-collapsed aside {
+                margin-left: -100%;
+            }
+        }
     </style>
 </head>
-<body class="font-sans bg-white dark:bg-ink text-neutral-900 dark:text-neutral-100 flex h-screen overflow-hidden">
+<body class="font-sans bg-white dark:bg-ink text-neutral-900 dark:text-neutral-100 flex h-screen overflow-hidden antialiased">
 
-    <aside class="w-64 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 flex flex-col">
-        <div class="p-4 border-b border-neutral-200 dark:border-neutral-800">
-            <a href="/" class="flex items-center justify-center gap-2 w-full bg-pine-600 hover:bg-pine-700 text-white font-medium py-2.5 px-4 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-neutral-950/40 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
+
+    <aside class="w-72 bg-neutral-50 dark:bg-neutral-900/90 border-r border-neutral-200/80 dark:border-neutral-800/80 flex flex-col h-full shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-40">
+
+        <div class="p-4 border-b border-neutral-200/70 dark:border-neutral-800/70 space-y-3">
+            <div class="flex items-center gap-2.5 px-1 py-0.5">
+                <div class="w-8 h-8 rounded-xl bg-pine-600/10 dark:bg-pine-400/15 flex items-center justify-center text-pine-600 dark:text-pine-400 font-bold text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path d="M4.913 2.658c2.075-.27 4.19-.408 6.337-.408 2.147 0 4.262.139 6.337.408 1.922.25 3.291 1.861 3.405 3.727a4.403 4.403 0 0 0-1.032-.211 50.89 50.89 0 0 0-8.71 0c-2.147.28-4.04 1.727-4.225 3.86a34.73 34.73 0 0 0-.21 4.542V19.5a2.25 2.25 0 0 1-2.25 2.25h-.75a2.25 2.25 0 0 1-2.25-2.25V9.456a6.75 6.75 0 0 1 5.922-6.69c.253-.034.507-.067.763-.098v-.01Z" />
+                        <path d="M7.747 8.25a3.75 3.75 0 0 1 3.708-3.327c1.868 0 3.706.121 5.508.358A3.75 3.75 0 0 1 20.25 9v10.5a2.25 2.25 0 0 1-2.25 2.25h-.75a2.25 2.25 0 0 1-2.25-2.25v-2.316a34.73 34.73 0 0 0-4.542-.21 34.73 34.73 0 0 0-4.542.21v2.316a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 19.5V11.25a3.75 3.75 0 0 1 4.747-3Z" />
+                    </svg>
+                </div>
+                <span class="font-bold text-sm tracking-tight">AI Assistant</span>
+            </div>
+
+            <a href="/" class="flex items-center justify-center gap-2 w-full bg-pine-600 hover:bg-pine-700 text-white text-xs font-semibold py-2 px-3 rounded-xl transition-all shadow-sm shadow-pine-600/20 active:scale-[0.98]">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
                     <path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1Z" />
                 </svg>
-                New chat
+                <span>New chat</span>
             </a>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-1">
-            <h3 class="text-xs font-medium text-neutral-400 dark:text-neutral-500 mb-3 px-3">History</h3>
+        <div class="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+            <div class="flex items-center justify-between px-3 mb-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">History</span>
+                <span class="text-[10px] bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 px-1.5 py-0.5 rounded-full font-medium">{{ threads|length if threads else 0 }}</span>
+            </div>
 
             {% if not threads %}
-                <p class="text-sm text-neutral-400 dark:text-neutral-600 px-3">No conversations yet.</p>
+                <div class="px-3 py-6 text-center">
+                    <p class="text-xs text-neutral-400 dark:text-neutral-600">No conversations yet.</p>
+                </div>
             {% endif %}
 
             {% for thread in threads %}
                 <a href="/chat/{{ thread }}"
-                   class="block px-3 py-2 text-sm rounded-lg truncate transition-colors {% if thread == thread_id %}bg-neutral-200 dark:bg-neutral-800 font-medium{% else %}hover:bg-neutral-100 dark:hover:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400{% endif %}">
-                  Chat {{ thread[:8] }}
+                   class="group/item flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl truncate transition-all {% if thread == thread_id %}bg-neutral-200/80 dark:bg-neutral-800 font-semibold text-neutral-900 dark:text-neutral-100 shadow-sm{% else %}hover:bg-neutral-100 dark:hover:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0 text-neutral-400 group-hover/item:text-pine-600 dark:group-hover/item:text-pine-400 transition-colors">
+                        <path fill-rule="evenodd" d="M3.43 2.524A41.29 41.29 0 0 1 10 2c2.236 0 4.43.18 6.57.524 1.437.231 2.43 1.49 2.43 2.902v5.148c0 1.413-.993 2.67-2.43 2.902a41.202 41.202 0 0 1-5.183.501.75.75 0 0 0-.528.247l-3.25 3.5A.75.75 0 0 1 6.25 17v-1.916c-.451-.035-.898-.077-1.341-.126C3.471 14.726 2.478 13.468 2.478 12.056V5.426c0-1.412.993-2.67 2.43-2.902Z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="truncate">Chat {{ thread[:8] }}</span>
                 </a>
             {% endfor %}
         </div>
 
-        <div class="p-3 border-t border-neutral-200 dark:border-neutral-800">
+        <div class="p-3 border-t border-neutral-200/70 dark:border-neutral-800/70">
             <details class="relative group/settings">
                 <summary class="flex items-center justify-between w-full p-2.5 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer list-none appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 [&::-webkit-details-marker]:hidden">
-                    <div class="flex items-center gap-2.5 text-sm font-medium">
+                    <div class="flex items-center gap-2.5 text-xs font-semibold">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 transition-transform duration-300 group-open/settings:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <circle cx="12" cy="12" r="3" />
@@ -94,11 +137,11 @@
                     </svg>
                 </summary>
 
-                <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 z-30">
+                <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-1.5 flex flex-col gap-1 z-30">
                     <button
                         hx-delete="/chat"
                         hx-confirm="Are you sure you want to permanently delete all conversations?"
-                        class="flex items-center gap-2.5 w-full text-xs font-medium px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
+                        class="flex items-center gap-2.5 w-full text-xs font-semibold px-3 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0" aria-hidden="true">
                             <path fill-rule="evenodd" d="M8.75 1a.75.75 0 0 0-.75.75V3H4a.75.75 0 0 0 0 1.5h.276l.66 10.29A2.25 2.25 0 0 0 7.183 17h5.634a2.25 2.25 0 0 0 2.247-2.21l.66-10.29H16A.75.75 0 0 0 16 3h-3.5V1.75a.75.75 0 0 0-.75-.75h-3ZM8.5 3V2.5h3V3h-3Zm-1.72 1.5h6.44l-.65 10.13a.75.75 0 0 1-.75.62H7.18a.75.75 0 0 1-.75-.62L5.78 4.5Z" clip-rule="evenodd" />
@@ -110,19 +153,34 @@
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col relative h-full">
+    <main class="flex-1 flex flex-col relative h-full min-w-0">
+
+        <header class="h-12 px-3 border-b border-neutral-200/70 dark:border-neutral-800/70 flex items-center shrink-0 bg-white dark:bg-ink z-10">
+            <button
+                type="button"
+                onclick="toggleSidebar()"
+                aria-label="Toggle sidebar"
+                class="p-2 rounded-xl text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600"
+            >
+                <svg id="toggle-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 transition-transform duration-300">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/>
+                    <path d="M9 3v18"/>
+                    <path d="m14 9-3 3 3 3"/>
+                </svg>
+            </button>
+        </header>
 
         <div id="chat-messages" class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
 
             {% if not messages %}
                 <div class="empty-state m-auto text-center max-w-xs">
-                    <div class="mx-auto mb-3 w-10 h-10 rounded-full bg-pine-600/10 dark:bg-pine-400/10 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 text-pine-600 dark:text-pine-400" aria-hidden="true">
+                    <div class="mx-auto mb-3 w-12 h-12 rounded-2xl bg-pine-600/10 dark:bg-pine-400/10 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6 text-pine-600 dark:text-pine-400" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.97-4.03 9-9 9-1.5 0-2.9-.37-4.14-1.02L3 21l1.06-3.7A8.96 8.96 0 0 1 3 12c0-4.97 4.03-9 9-9s9 4.03 9 9Z" />
                         </svg>
                     </div>
-                    <p class="text-sm font-medium">Start the conversation</p>
-                    <p class="text-sm text-neutral-400 dark:text-neutral-600 mt-1">Type a message below to begin.</p>
+                    <p class="text-sm font-semibold">Start the conversation</p>
+                    <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1">Type a message below to begin.</p>
                 </div>
             {% endif %}
 
@@ -141,7 +199,7 @@
                             {% endif %}
 
                             {% if msg.content %}
-                                <div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white">{{ msg.content }}</div>
+                                <div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white shadow-sm">{{ msg.content }}</div>
                             {% endif %}
 
                             <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn mt-1.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity focus-visible:outline-none">
@@ -152,7 +210,7 @@
                         </div>
 
                         <div class="group/avatar relative shrink-0">
-                            <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default">
+                            <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default ring-2 ring-white dark:ring-ink">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                             </div>
                             <span class="pointer-events-none absolute bottom-full mb-1.5 right-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 opacity-0 group-hover/avatar:opacity-100 transition-opacity z-20 shadow">
@@ -163,7 +221,7 @@
                 {% else %}
                     <article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3">
                         <div class="group/avatar relative shrink-0">
-                            <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 cursor-default">
+                            <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 cursor-default ring-2 ring-white dark:ring-ink">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
                             </div>
                             <span class="pointer-events-none absolute bottom-full mb-1.5 left-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 opacity-0 group-hover/avatar:opacity-100 transition-opacity z-20 shadow">
@@ -172,7 +230,7 @@
                         </div>
 
                         <div class="group flex flex-col items-start min-w-0 max-w-[min(80%,36rem)]">
-                            <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800">{{ msg.content }}</div>
+                            <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800 shadow-sm">{{ msg.content }}</div>
 
                             <div class="flex items-center gap-4 mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity w-full">
 
@@ -264,7 +322,7 @@
                         class="flex-1 bg-transparent text-sm focus:outline-none resize-none max-h-36 py-1 overflow-y-auto"
                     ></textarea>
 
-                    <button type="submit" id="submit-btn" aria-label="Send message" class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400">
+                    <button type="submit" id="submit-btn" aria-label="Send message" class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400 shadow-sm active:scale-95">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
                             <path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.573a.75.75 0 1 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.14v10.64A.75.75 0 0 1 10 17Z" clip-rule="evenodd" />
                         </svg>
@@ -279,6 +337,24 @@
         const form = document.getElementById('chat-form');
         const submitBtn = document.getElementById('submit-btn');
         const chatContainer = document.getElementById('chat-messages');
+        const backdrop = document.getElementById('sidebar-backdrop');
+
+        function toggleSidebar() {
+            document.body.classList.toggle('sidebar-collapsed');
+            const isClosed = document.body.classList.contains('sidebar-collapsed');
+
+            if (window.innerWidth < 768) {
+                if (!isClosed) {
+                    backdrop.classList.remove('hidden');
+                } else {
+                    backdrop.classList.add('hidden');
+                }
+            }
+        }
+
+        if (window.innerWidth < 768) {
+            document.body.classList.add('sidebar-collapsed');
+        }
 
         function autoResize(el) {
             el.style.height = 'auto';
@@ -333,7 +409,6 @@
 
         observer.observe(chatContainer, { childList: true, subtree: true });
 
-        // Gestione allegati
         function updateFilePreview(input) {
             const preview = document.getElementById('file-preview');
             const nameDisplay = document.getElementById('file-name-display');
