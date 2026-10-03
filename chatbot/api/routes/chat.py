@@ -145,108 +145,61 @@ async def add_user_message(
 async def add_assistant_message(
     request: Request,
     thread_id: str,
-    user_message_json: str = Form(...),
+    user_message_json: str | None = Form(None),
+    approved: str | None = Form(None),
+    reason: str | None = Form(None),
 ):
     """Generate an assistant message for the given ID thread"""
 
-    # Retrieve the user message and validate it.
-    user_message = UserResponse.model_validate_json(user_message_json)
+    # Define input for the graph execution.
+    if user_message_json:
+        user_message = UserResponse.model_validate_json(user_message_json)
+        content = [{"type": "text", "text": user_message.content}]
+        additional_kwargs = {}
 
-    content = [{"type": "text", "text": user_message.content}]
-    additional_kwargs = {}
-
-    # Handle optional attachment.
-    if attachment := user_message.attachment:
-        # Prepare attachment content for LLM (in this case for Gemini). TODO: Generalize?
-        content.append(
-            {
-                "type": "media",
-                "mime_type": attachment.type,
-                "file_uri": attachment.file_uri,
+        if attachment := user_message.attachment:
+            content.append(
+                {
+                    "type": "media",
+                    "mime_type": attachment.type,
+                    "file_uri": attachment.file_uri,
+                }
+            )
+            additional_kwargs["file_metadata"] = {
+                "id": attachment.id,
+                "size": attachment.size,
             }
+
+        message = HumanMessage(
+            id=user_message.id,
+            name=user_message.name,
+            content=content,
+            additional_kwargs=additional_kwargs,
         )
-        additional_kwargs["file_metadata"] = {
-            "id": attachment.id,
-            "size": attachment.size,
+        graph_input = {
+            "messages": [message],
+            "user_preferences": {"style": "technical", "verbosity": "detailed"},
         }
-
-    # Create human message.
-    message = HumanMessage(
-        id=user_message.id,
-        name=user_message.name,
-        content=content,
-        additional_kwargs=additional_kwargs,
-    )
-
-    inputs = {"messages": [message], "user_preferences": {"style": "technical", "verbosity": "detailed"}}
-
-    thread_config = RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT)
-    context_obj = Context(
-        chatbot_name=S.CHATBOT_NAME,
-        model=llm,
-        system_prompt=SYSTEM_PROMPT.format(
-            user_name="Pietro",  # TODO: cambialo in modo da personalizzarlo
-            bot_name=S.CHATBOT_NAME,
-        ),
-        tools=ALL_TOOLS,
-        vector_store=request.app.state.vector_store,
-    )
-
-    # Initial graph execution.
-    try:
-        response = await GRAPH.ainvoke(
-            inputs,
-            stream_mode="values",
-            config=thread_config,
-            context=context_obj,
+    elif approved is not None:
+        is_approved = approved.lower() == "true"
+        decisions = (
+            [{"type": "approve"}]
+            if is_approved
+            else [{"type": "reject", "message": reason or "Action rejected by user."}]
         )
-    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError) as e:
+        graph_input = Command(resume={"decisions": decisions})
+    else:
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
+            context={"error": "Request not valid: no message or decision provided."},
         )
 
-    # Check graph state if stopped for interrupt (human-into-the-loop).
-    state_snapshot = await GRAPH.aget_state(thread_config)
-    if state_snapshot.next:
-        pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/approval_request.html",
-            context={
-                "thread_id": thread_id,
-                "approval_info": pending_interrupt,
-            },
-        )
-
-    # If not interrupt, continue the execution.
-    messages = response["messages"]
-    start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
-    messages = messages[start_idx:]
-
-    # Create assistant response.
-    assistant_message = extract_assistant_response(messages)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="partials/assistant_message.html",
-        context={"response": assistant_message},
+    # Define the graph configuration.
+    thread_config = RunnableConfig(
+        configurable={"thread_id": thread_id},
+        recursion_limit=S.RECURSION_LIMIT,
     )
-
-
-@chat_router.post(path="/chat/{thread_id}/resume", response_class=HTMLResponse)
-async def resume_chat(
-    request: Request,
-    thread_id: str,
-    approved: str = Form(...),
-    reason: str | None = Form(None),
-):
-    """Resume a paused agent thread based on human feedback."""
-
-    is_approved = approved.lower() == "true"
-
-    thread_config = RunnableConfig(configurable={"thread_id": thread_id}, recursion_limit=S.RECURSION_LIMIT)
     context_obj = Context(
         chatbot_name=S.CHATBOT_NAME,
         model=llm,
@@ -258,22 +211,11 @@ async def resume_chat(
         vector_store=request.app.state.vector_store,
     )
 
-    if is_approved:
-        decisions = [{"type": "approve"}]
-    else:
-        decisions = [
-            {
-                "type": "reject",
-                "message": reason if reason else "Action rejected by user.",
-            }
-        ]
-
-    resume_payload = {"decisions": decisions}
-
-    # Resume graph execution.
+    # Graph execution.
     try:
         response = await GRAPH.ainvoke(
-            Command(resume=resume_payload),
+            graph_input,
+            stream_mode="values",
             config=thread_config,
             context=context_obj,
         )
@@ -284,7 +226,7 @@ async def resume_chat(
             context={"error": "A system error occurred while processing your request. Please try again in a moment."},
         )
 
-    # Check for another interrupt.
+    # Check for interrupt.
     state_snapshot = await GRAPH.aget_state(thread_config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
@@ -297,7 +239,7 @@ async def resume_chat(
             },
         )
 
-    # If not interrupt, continue the execution.
+    # Get messages.
     messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
     messages = messages[start_idx:]

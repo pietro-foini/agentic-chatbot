@@ -32,14 +32,12 @@ from chatbot.storage.config import storage_client
 
 
 @tool("list_tables", args_schema=ListTablesInput, response_format="content")
-async def list_tables(db_name: DBName, runtime: ToolRuntime) -> str:
+async def list_tables(db_name: DBName) -> str:
     """
     Retrieve a list of all available tables in a specified PostgreSQL database.
 
     :param db_name: name of the database to list tables from
     :type db_name: DBName
-    :param runtime: the runtime (parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: list of table names
     :rtype: str
     """
@@ -65,7 +63,7 @@ async def list_tables(db_name: DBName, runtime: ToolRuntime) -> str:
 
 
 @tool("describe_table", args_schema=DescribeTableInput, response_format="content")
-async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime) -> str:
+async def describe_table(db_name: DBName, table_name: str) -> str:
     """
     Retrieve information about a PostgreSQL table, like information, schema and column details.
 
@@ -73,8 +71,6 @@ async def describe_table(db_name: DBName, table_name: str, runtime: ToolRuntime)
     :type db_name: DBName
     :param table_name: the name of the table to search info about
     :type table_name: str
-    :param runtime: the runtime (parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: the table information
     :rtype: str
     """

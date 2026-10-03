@@ -51,7 +51,7 @@
             <div class="flex items-center gap-2">
                 <button
                     type="button"
-                    hx-post="/chat/{{ thread_id }}/resume"
+                    hx-post="/chat/{{ thread_id }}/assistant"
                     hx-vals='{"approved": "true"}'
                     hx-target="#approval-card-{{ thread_id }}"
                     hx-swap="outerHTML"
@@ -65,7 +65,7 @@
 
                 <button
                     type="button"
-                    hx-post="/chat/{{ thread_id }}/resume"
+                    hx-post="/chat/{{ thread_id }}/assistant"
                     hx-vals='{"approved": "false", "reason": "Operation canceled by user."}'
                     hx-target="#approval-card-{{ thread_id }}"
                     hx-swap="outerHTML"
