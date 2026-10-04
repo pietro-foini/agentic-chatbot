@@ -16,8 +16,8 @@ from chatbot.db.config import async_pool
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.graphs.v2.agent import GRAPH
-from chatbot.llm.ollama import llm
+from chatbot.graphs.v3.agent import GRAPH
+from chatbot.llm.google import llm
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_assistant_response, parse_messages
@@ -219,7 +219,12 @@ async def add_assistant_message(
             config=thread_config,
             context=context_obj,
         )
-    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError) as e:
+    except (
+        GraphRecursionError,
+        ChatGoogleGenerativeAIError,
+        ValueError,
+        ServerError,
+    ):
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
