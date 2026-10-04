@@ -1,3 +1,5 @@
+from typing import Awaitable, Callable
+
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     HumanInTheLoopMiddleware,
@@ -20,13 +22,22 @@ store = InMemoryStore()
 
 
 @wrap_model_call
-async def inject_dynamic_prompt(request: ModelRequest, handler) -> ModelResponse:
+async def dynamic_prompt(
+    request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]
+) -> ModelResponse:
     """Dynamic prompt"""
 
-    # Overwrite or add system message.
     new_system_message = SystemMessage(content=[{"type": "text", "text": request.runtime.context.system_prompt}])
-
     return await handler(request.override(system_message=new_system_message))
+
+
+@wrap_model_call
+async def dynamic_model(
+    request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]
+) -> ModelResponse:
+    """Dynamic model"""
+
+    return await handler(request.override(model=request.runtime.context.model))
 
 
 # Create the graph instance.
@@ -39,7 +50,8 @@ GRAPH = create_agent(
     checkpointer=postgres_checkpointer,
     store=store,
     middleware=[
-        inject_dynamic_prompt,
+        dynamic_prompt,
+        dynamic_model,
         ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
         ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
     ]

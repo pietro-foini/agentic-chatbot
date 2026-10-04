@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from chatbot.db.config import create_readonly_async_engine
 from chatbot.graphs.data import DBName, Source
-from chatbot.graphs.models import (
+from chatbot.graphs.schemas import (
     CodePlotInput,
     DescribeTableInput,
     ListTablesInput,
