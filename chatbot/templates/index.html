@@ -122,6 +122,7 @@
             {% endfor %}
         </div>
 
+        <!-- Settings Section -->
         <div class="p-3 border-t border-neutral-200/70 dark:border-neutral-800/70">
             <details class="relative group/settings">
                 <summary class="flex items-center justify-between w-full p-2.5 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer list-none appearance-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 [&::-webkit-details-marker]:hidden">
@@ -137,11 +138,58 @@
                     </svg>
                 </summary>
 
-                <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-1.5 flex flex-col gap-1 z-30">
+                <!-- Settings Popover -->
+                <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-3 flex flex-col gap-3 z-30">
+
+                    <!-- Multi-level Model Selection -->
+                    <div class="flex flex-col gap-1.5">
+                        <label for="model-select" class="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 px-1">
+                            Model Selection
+                        </label>
+                        <div class="relative">
+                            <select
+                                id="model-select"
+                                name="model_name"
+                                onchange="onModelChange(this.value)"
+                                class="w-full appearance-none bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs rounded-xl px-3 py-2 pr-8 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-pine-600 dark:focus:ring-pine-400 cursor-pointer"
+                            >
+                                {% if model_categories %}
+                                    {% for category, models in model_categories.items() %}
+                                        <optgroup label="── {{ category }} ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
+                                            {% for m in models %}
+                                                <option value="{{ m }}" {% if m == default_model %}selected{% endif %} class="text-neutral-900 dark:text-neutral-100 font-normal">
+                                                    {{ m }}
+                                                </option>
+                                            {% endfor %}
+                                        </optgroup>
+                                    {% endfor %}
+                                {% else %}
+                                    <!-- Fallback default categories -->
+                                    <optgroup label="── Proprietary ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                                    </optgroup>
+                                    <optgroup label="── Open-Source ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
+                                        <option value="llama3.2">llama3.2</option>
+                                        <option value="mistral">mistral</option>
+                                    </optgroup>
+                                {% endif %}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-neutral-200/70 dark:bg-neutral-800/70"></div>
+
+                    <!-- Delete button -->
                     <button
                         hx-delete="/chat"
                         hx-confirm="Are you sure you want to permanently delete all conversations?"
-                        class="flex items-center gap-2.5 w-full text-xs font-semibold px-3 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
+                        class="flex items-center gap-2.5 w-full text-xs font-semibold px-2.5 py-1.5 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0" aria-hidden="true">
                             <path fill-rule="evenodd" d="M8.75 1a.75.75 0 0 0-.75.75V3H4a.75.75 0 0 0 0 1.5h.276l.66 10.29A2.25 2.25 0 0 0 7.183 17h5.634a2.25 2.25 0 0 0 2.247-2.21l.66-10.29H16A.75.75 0 0 0 16 3h-3.5V1.75a.75.75 0 0 0-.75-.75h-3ZM8.5 3V2.5h3V3h-3Zm-1.72 1.5h6.44l-.65 10.13a.75.75 0 0 1-.75.62H7.18a.75.75 0 0 1-.75-.62L5.78 4.5Z" clip-rule="evenodd" />
@@ -155,7 +203,7 @@
 
     <main class="flex-1 flex flex-col relative h-full min-w-0">
 
-        <header class="h-12 px-3 border-b border-neutral-200/70 dark:border-neutral-800/70 flex items-center shrink-0 bg-white dark:bg-ink z-10">
+        <header class="h-12 px-3 border-b border-neutral-200/70 dark:border-neutral-800/70 flex items-center justify-between shrink-0 bg-white dark:bg-ink z-10">
             <button
                 type="button"
                 onclick="toggleSidebar()"
@@ -168,6 +216,12 @@
                     <path d="m14 9-3 3 3 3"/>
                 </svg>
             </button>
+
+            <!-- Pill indicatore del modello attivo nell'header -->
+            <div id="active-model-badge" class="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1 rounded-full border border-neutral-200/50 dark:border-neutral-700/50 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-pine-500"></span>
+                <span id="active-model-name">Loading...</span>
+            </div>
         </header>
 
         <div id="chat-messages" class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
@@ -283,6 +337,7 @@
             {% endfor %}
         </div>
 
+        <!-- Chat Input Form: include hx-include="#model-select" so model_name is also available -->
         <div class="p-4 shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-ink">
             <form
                 id="chat-form"
@@ -290,6 +345,7 @@
                 hx-target="#chat-messages"
                 hx-swap="beforeend"
                 hx-encoding="multipart/form-data"
+                hx-include="#model-select"
                 class="flex flex-col gap-2 max-w-4xl mx-auto bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-2 pl-4 focus-within:ring-2 focus-within:ring-pine-600 dark:focus-within:ring-pine-400 transition-shadow"
             >
                 <div id="file-preview" class="hidden items-center gap-2 bg-neutral-200 dark:bg-neutral-800 text-xs px-3 py-1.5 rounded-xl w-fit">
@@ -338,6 +394,30 @@
         const submitBtn = document.getElementById('submit-btn');
         const chatContainer = document.getElementById('chat-messages');
         const backdrop = document.getElementById('sidebar-backdrop');
+        const modelSelect = document.getElementById('model-select');
+        const activeModelName = document.getElementById('active-model-name');
+
+        // Manage model choice and local storage persistence
+        function syncModelBadge(name) {
+            if (activeModelName) activeModelName.textContent = name;
+        }
+
+        function onModelChange(val) {
+            localStorage.setItem('selected_llm_model', val);
+            syncModelBadge(val);
+        }
+
+        // Restore model selection from localStorage if saved
+        const savedModel = localStorage.getItem('selected_llm_model');
+        if (savedModel && modelSelect) {
+            const exists = Array.from(modelSelect.options).some(opt => opt.value === savedModel);
+            if (exists) {
+                modelSelect.value = savedModel;
+            }
+        }
+        if (modelSelect) {
+            syncModelBadge(modelSelect.value);
+        }
 
         function toggleSidebar() {
             document.body.classList.toggle('sidebar-collapsed');

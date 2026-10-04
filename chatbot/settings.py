@@ -5,11 +5,24 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Store here env variable."""
 
-    # Google Cloud Platform.
+    # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
     REGION: str = Field(description="The region of the Google Cloud Platform project")
+
+    # Google Cloud Storage.
     GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
-    MODEL_NAME: str = Field(description="The name of the LLM model")
+
+    # LLM.
+    # Default.
+    MODEL_NAME: str = Field(default="qwen2.5:7b", description="The default LLM model")
+    # Google.
+    GOOGLE_MODEL_NAMES: list[str] = Field(
+        default=["gemini-2.5-flash-lite"], description="The names of the Google LLM models"
+    )
+    # Ollama.
+    OLLAMA_MODEL_NAMES: list[str] = Field(
+        default=["qwen2.5:7b", "gemma4:12b"], description="The names of the Ollama LLM models"
+    )
 
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")

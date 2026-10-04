@@ -16,8 +16,8 @@ from chatbot.db.config import async_pool
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.graphs.v3.agent import GRAPH
-from chatbot.llm.google import llm
+from chatbot.graphs.v2.agent import GRAPH
+from chatbot.llm.config import MODELS_BY_CATEGORY, get_model
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_assistant_response, parse_messages
@@ -77,6 +77,8 @@ async def get_chat(request: Request, thread_id: str):
             "messages": parsed_messages,
             "thread_id": thread_id,
             "threads": [str(row[0]) for row in rows],
+            "model_categories": MODELS_BY_CATEGORY,
+            "default_model": S.MODEL_NAME,
         },
     )
 
@@ -126,7 +128,7 @@ async def add_user_message(
     # Create user response.
     user_message = UserResponse(
         id=str(uuid.uuid4()),
-        name="Pietro",  # TODO: cambialo in modo da personalizzarlo
+        name="Pietro",  # TODO: change it
         content=message,
         attachment=attachment,
     )
@@ -148,6 +150,7 @@ async def add_assistant_message(
     user_message_json: str | None = Form(None),
     approved: str | None = Form(None),
     reason: str | None = Form(None),
+    model_name: str | None = Form(None),
 ):
     """Generate an assistant message for the given ID thread"""
 
@@ -202,9 +205,9 @@ async def add_assistant_message(
     )
     context_obj = Context(
         chatbot_name=S.CHATBOT_NAME,
-        model=llm,
+        model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
-            user_name="Pietro",
+            user_name="Pietro",  # TODO: change it
             bot_name=S.CHATBOT_NAME,
         ),
         tools=ALL_TOOLS,
@@ -224,11 +227,13 @@ async def add_assistant_message(
         ChatGoogleGenerativeAIError,
         ValueError,
         ServerError,
-    ):
+    ) as e:
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
+            context={
+                "error": f"A system error occurred while processing your request: {e}. Please try again in a moment."
+            },
         )
 
     # Check for interrupt.

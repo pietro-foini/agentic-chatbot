@@ -30,7 +30,7 @@
     </div>
 </article>
 
-<form hx-post="/chat/{{ thread_id }}/assistant" hx-trigger="load" hx-swap="outerHTML" class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3 mt-5">
+<form hx-post="/chat/{{ thread_id }}/assistant" hx-trigger="load" hx-swap="outerHTML" hx-include="#model-select" class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3 mt-5">
     <input type="hidden" name="user_message_json" value='{{ user_message.model_dump_json() }}'>
 
     <div class="group/avatar relative shrink-0">
