@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         default=["qwen2.5:7b", "gemma4:12b"], description="The names of the Ollama LLM models"
     )
 
+    # Embeddings.
+    # Default.
+    EMBEDDINGS_NAME: str = Field(default="bge-m3:latest", description="The name of the embedding model")
+
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")
     DB_PASSWORD: str = Field(description="The password of the PostgreSQL database")
@@ -43,7 +47,7 @@ class Settings(BaseSettings):
         description="Maximum number of tokens the LLM can generate per request",
     )
     THINKING_BUDGET: int = Field(
-        default=1024,
+        default=0,
         description="Internal LLM processing budget for a single request",
     )
     TIMEOUT_LLM: int = Field(

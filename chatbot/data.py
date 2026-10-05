@@ -52,4 +52,3 @@ class AssistantResponse(BaseResponse):
     table: str | None = None
     image: str | None = None
     thinking: list[ThinkingStep] = Field(default_factory=list)
-    response_time: float = 0.0
