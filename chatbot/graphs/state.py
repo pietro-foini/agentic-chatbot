@@ -1,4 +1,6 @@
+import operator
 from dataclasses import dataclass
+from typing import Annotated
 
 from langchain.agents import AgentState
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -14,7 +16,8 @@ __all__ = [
 class State(AgentState):
     """Agent state"""
 
-    pass
+    total_input_tokens: Annotated[int, operator.add]
+    total_output_tokens: Annotated[int, operator.add]
 
 
 @dataclass

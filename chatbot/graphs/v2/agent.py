@@ -1,10 +1,9 @@
 import time
-from datetime import datetime
 from typing import Awaitable, Callable
-from zoneinfo import ZoneInfo
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
+    ExtendedModelResponse,
     HumanInTheLoopMiddleware,
     InterruptOnConfig,
     ModelRequest,
@@ -48,7 +47,7 @@ async def inject_dynamic_model(
 @wrap_model_call
 async def track_model_metrics(
     request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]
-) -> ModelResponse:
+) -> ExtendedModelResponse:
     """Track model metrics"""
 
     start_time = time.time()
@@ -56,16 +55,27 @@ async def track_model_metrics(
     end_time = time.time()
 
     elapsed = round(end_time - start_time, 2)
-    ts = datetime.now(ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d %H:%M:%S")
+
+    total_input_tokens, total_output_tokens = 0, 0
 
     for msg in response.result:
         msg.response_metadata = {
             **(getattr(msg, "response_metadata", {}) or {}),
             "elapsed_time": elapsed,
-            "timestamp": ts,
         }
+        if hasattr(msg, "usage_metadata") and msg.usage_metadata:
+            total_input_tokens += msg.usage_metadata.get("input_tokens", 0)
+            total_output_tokens += msg.usage_metadata.get("output_tokens", 0)
 
-    return response
+    return ExtendedModelResponse(
+        model_response=response,
+        command=Command(
+            update={
+                "total_input_tokens": total_input_tokens,
+                "total_output_tokens": total_output_tokens,
+            }
+        ),
+    )
 
 
 @wrap_tool_call
@@ -80,13 +90,11 @@ async def track_tool_metrics(
     end_time = time.time()
 
     elapsed = round(end_time - start_time, 2)
-    ts = datetime.now(ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d %H:%M:%S")
 
     if isinstance(result, ToolMessage):
         result.response_metadata = {
             **(result.response_metadata or {}),
             "elapsed_time": elapsed,
-            "timestamp": ts,
         }
     elif isinstance(result, Command) and isinstance(result.update, dict):
         messages = result.update.get("messages", [])
@@ -95,7 +103,6 @@ async def track_tool_metrics(
                 msg.response_metadata = {
                     **(msg.response_metadata or {}),
                     "elapsed_time": elapsed,
-                    "timestamp": ts,
                 }
 
     return result

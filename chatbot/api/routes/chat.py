@@ -23,6 +23,7 @@ from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.graphs.v2.agent import GRAPH
 from chatbot.llm.config import CATEGORIZED_MODELS, get_model
+from chatbot.llm.pricing import compute_cost
 from chatbot.schemas import Attachment, UserResponse
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
@@ -96,6 +97,11 @@ async def get_chat(
     state = await GRAPH.aget_state({"configurable": {"thread_id": thread_id}})
     messages = state.values.get("messages", []) if state and hasattr(state, "values") else []
 
+    # Retrieve costs.
+    in_tokens = state.values.get("total_input_tokens", 0) if state and hasattr(state, "values") else 0
+    out_tokens = state.values.get("total_output_tokens", 0) if state and hasattr(state, "values") else 0
+    cost_amount = compute_cost(in_tokens, out_tokens)
+
     # Security check if the thread belongs to another user.
     if state and state.metadata:
         thread_owner = state.metadata.get("user_id")
@@ -122,6 +128,7 @@ async def get_chat(
             "threads": [str(row[0]) for row in result.all()],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
+            "chat_cost": f"${cost_amount:.5f}",
         },
     )
 
@@ -172,7 +179,7 @@ async def add_user_message(
     # Create user response.
     user_message = UserResponse(
         id=str(uuid.uuid4()),
-        name=current_user.full_name or "User",
+        name=current_user.username or "user",
         content=message,
         attachment=attachment,
     )
@@ -297,6 +304,11 @@ async def add_assistant_message(
             },
         )
 
+    in_tokens = state_snapshot.values.get("total_input_tokens", 0)
+    out_tokens = state_snapshot.values.get("total_output_tokens", 0)
+
+    cost_amount = compute_cost(in_tokens, out_tokens)
+
     # Get messages.
     messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
@@ -308,5 +320,8 @@ async def add_assistant_message(
     return templates.TemplateResponse(
         request=request,
         name="partials/assistant_message.html",
-        context={"response": assistant_message},
+        context={
+            "response": assistant_message,
+            "total_cost": f"${cost_amount:.5f}",
+        },
     )

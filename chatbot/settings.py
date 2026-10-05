@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # LLM.
     # Default.
-    MODEL_NAME: str = Field(default="qwen2.5:7b", description="The default LLM model")
+    MODEL_NAME: str = Field(default="gemini-2.5-flash-lite", description="The default LLM model")
     # Google.
     GOOGLE_MODEL_NAMES: list[str] = Field(
         default=["gemini-2.5-flash-lite"], description="The names of the Google LLM models"
