@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any, Mapping
 
 from sqlalchemy import Connection, text
@@ -35,6 +37,18 @@ class PostgresAsyncHandler(DBInterface):
             expire_on_commit=False,
             autoflush=False,
         )
+
+    @asynccontextmanager
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Provides a transactional scope around a series of operations"""
+
+        async with self.session() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     async def init_db(self) -> None:
         """Create all tables defined in Base.metadata if they do not exist"""

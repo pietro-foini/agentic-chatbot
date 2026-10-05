@@ -5,6 +5,13 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Store here env variable"""
 
+    # Authentication.
+    SECRET_KEY: str = Field(description="The secret key for the authentication")
+    ALGORITHM: str = Field(default="HS256", description="The algorithm to use for authentication")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=60, description="The number of minutes after which the access token expires"
+    )
+
     # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
     REGION: str = Field(description="The region of the Google Cloud Platform project")

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from langchain_postgres import PGEngine, PGVectorStore
 
-from chatbot.api.routes import chat_router
+from chatbot.api.routes import auth_router, chat_router
 from chatbot.db.config import checkpointer, db, pool
 from chatbot.embeddings.config import embeddings
 from chatbot.settings import S
@@ -28,8 +28,6 @@ async def lifespan(app: FastAPI):
         embedding_service=embeddings,
         metadata_columns=["source"],
     )
-
-    app.state.db = db
     app.state.vector_store = vector_store
 
     yield
@@ -44,4 +42,5 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth_router)
 app.include_router(chat_router)

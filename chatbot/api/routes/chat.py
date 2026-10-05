@@ -1,18 +1,23 @@
 import asyncio
 import uuid
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from google.genai.errors import ServerError
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
+from langchain_postgres import PGVectorStore
 from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from chatbot.db.config import pool
+from chatbot.api.dependencies import get_current_user, get_session, get_vector_store
+from chatbot.db.models import UserModel
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
@@ -29,7 +34,9 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent
 
 
 @chat_router.get(path="/")
-async def new_chat():
+async def new_chat(
+    current_user: Annotated[UserModel, Depends(get_current_user)],
+):
     """Create a new chat"""
 
     thread_id = str(uuid.uuid4())
@@ -38,15 +45,37 @@ async def new_chat():
 
 
 @chat_router.delete(path="/chat")
-async def delete_chats():
-    """Delete all the chat threads"""
+async def delete_chats(
+    current_user: Annotated[UserModel, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Delete all the chat threads belonging to the current user"""
 
-    # Delete all the data referring to the persistent memory stored on database.
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "TRUNCATE TABLE checkpoints, checkpoint_writes, checkpoint_blobs, checkpoint_migrations RESTART IDENTITY CASCADE;"
-            )
+    await session.execute(
+        text("""
+            DELETE FROM checkpoint_writes 
+            WHERE thread_id IN (
+                SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id
+            );
+        """),
+        {"user_id": str(current_user.id)},
+    )
+    await session.execute(
+        text("""
+            DELETE FROM checkpoint_blobs 
+            WHERE thread_id IN (
+                SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id
+            );
+        """),
+        {"user_id": str(current_user.id)},
+    )
+    await session.execute(
+        text("""
+            DELETE FROM checkpoints 
+            WHERE metadata ->> 'user_id' = :user_id;
+        """),
+        {"user_id": str(current_user.id)},
+    )
 
     response = HTMLResponse()
     response.headers["HX-Redirect"] = "/"
@@ -55,21 +84,34 @@ async def delete_chats():
 
 
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
-async def get_chat(request: Request, thread_id: str):
-    """Retrieve the chat history for the given ID thread"""
+async def get_chat(
+    request: Request,
+    thread_id: str,
+    current_user: Annotated[UserModel, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Retrieve the chat history for the given ID thread and the current user"""
 
     # Retrieve messages from graph state of the current thread.
     state = await GRAPH.aget_state({"configurable": {"thread_id": thread_id}})
     messages = state.values.get("messages", []) if state and hasattr(state, "values") else []
 
+    # Security check if the thread belongs to another user.
+    if state and state.metadata:
+        thread_owner = state.metadata.get("user_id")
+        if thread_owner and thread_owner != str(current_user.id):
+            # TODO: adjust UI
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have the permission for accessing this chat.",
+            )
+
     # Parse messages for UI rendering purposes.
     parsed_messages = parse_messages(messages)
 
-    # Retrieve the list of all the threads in order to visualize them into the chronology.
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT DISTINCT thread_id FROM checkpoints;")
-            rows = await cur.fetchall()
+    # Retrieve the list of all the threads specific for the user in order to visualize them into the chronology.
+    query = text("SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id;")
+    result = await session.execute(query, {"user_id": str(current_user.id)})
 
     return templates.TemplateResponse(
         request=request,
@@ -77,7 +119,7 @@ async def get_chat(request: Request, thread_id: str):
         context={
             "messages": parsed_messages,
             "thread_id": thread_id,
-            "threads": [str(row[0]) for row in rows],
+            "threads": [str(row[0]) for row in result.all()],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
         },
@@ -88,6 +130,7 @@ async def get_chat(request: Request, thread_id: str):
 async def add_user_message(
     request: Request,
     thread_id: str,
+    current_user: Annotated[UserModel, Depends(get_current_user)],
     message: str = Form(...),
     file: UploadFile | None = File(None),
 ):
@@ -129,7 +172,7 @@ async def add_user_message(
     # Create user response.
     user_message = UserResponse(
         id=str(uuid.uuid4()),
-        name="Pietro",  # TODO: change it
+        name=current_user.full_name or "User",
         content=message,
         attachment=attachment,
     )
@@ -148,6 +191,8 @@ async def add_user_message(
 async def add_assistant_message(
     request: Request,
     thread_id: str,
+    current_user: Annotated[UserModel, Depends(get_current_user)],
+    vector_store: PGVectorStore = Depends(get_vector_store),
     user_message_json: str | None = Form(None),
     approved: str | None = Form(None),
     reason: str | None = Form(None),
@@ -202,17 +247,21 @@ async def add_assistant_message(
     # Define the graph configuration.
     config = RunnableConfig(
         configurable={"thread_id": thread_id},
+        metadata={
+            "user_id": str(current_user.id),
+            "username": current_user.username,
+        },
         recursion_limit=S.RECURSION_LIMIT,
     )
     context = Context(
         chatbot_name=S.CHATBOT_NAME,
         model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
-            user_name="Pietro",  # TODO: change it
+            user_name=current_user.full_name or "User",
             bot_name=S.CHATBOT_NAME,
         ),
         tools=ALL_TOOLS,
-        vector_store=request.app.state.vector_store,
+        vector_store=vector_store,
     )
 
     # Graph execution.
