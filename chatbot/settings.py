@@ -1,9 +1,9 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Store here env variable."""
+    """Store here env variable"""
 
     # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
@@ -30,9 +30,9 @@ class Settings(BaseSettings):
 
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")
-    DB_PASSWORD: str = Field(description="The password of the PostgreSQL database")
+    DB_PASSWORD: SecretStr = Field(description="The password of the PostgreSQL database")
     DB_HOST: str = Field(description="The host of the PostgreSQL database")
-    DB_PORT: str = Field(description="The port of the PostgreSQL database")
+    DB_PORT: int = Field(description="The port of the PostgreSQL database")
     DB_NAME: str = Field(description="The PostgreSQL database name")
     TABLE_NAME_VECTORS: str = Field(
         default="ml_vectors",
