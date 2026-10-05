@@ -1,4 +1,4 @@
-from typing import Any, AsyncGenerator, Mapping
+from typing import Any, Mapping
 
 from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -25,7 +25,7 @@ class PostgresAsyncHandler(DBInterface):
             server_settings["default_transaction_read_only"] = "on"
 
         self.engine: AsyncEngine = create_async_engine(
-            db_uri,
+            f"postgresql+asyncpg://{db_uri}",
             connect_args={"server_settings": server_settings},
             pool_pre_ping=True,
         )
@@ -44,18 +44,6 @@ class PostgresAsyncHandler(DBInterface):
 
         async with self.engine.begin() as conn:
             await conn.run_sync(_create_tables)
-
-    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Provide a transactional scope around a series of operations per HTTP request"""
-
-        async with self.session() as session:
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
 
     async def connect(self) -> None:
         """Verify the connection is alive"""

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from pathlib import Path
 
@@ -115,7 +116,7 @@ async def add_user_message(
         filename = f"{uuid.uuid4()}_{file.filename}"
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
         blob = bucket.blob(f"attachments/{filename}")
-        blob.upload_from_string(content_bytes, content_type=mime_type)
+        await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=mime_type)
 
         # Create attachment object.
         attachment = Attachment(
@@ -227,13 +228,11 @@ async def add_assistant_message(
         ChatGoogleGenerativeAIError,
         ValueError,
         ServerError,
-    ) as e:
+    ):
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={
-                "error": f"A system error occurred while processing your request: {e}. Please try again in a moment."
-            },
+            context={"error": f"A system error occurred while processing your request. Please try again in a moment."},
         )
 
     # Check for interrupt.

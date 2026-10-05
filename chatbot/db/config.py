@@ -17,8 +17,7 @@ checkpointer = AsyncPostgresSaver(pool)
 
 # Required by langchain-postgres (PGEngine / PGVectorStore) and authentication.
 db = PostgresAsyncHandler(
-    db_uri=f"postgresql+asyncpg://{S.database_url}",
+    db_uri=S.database_url,
     readonly=False,
     statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
 )
-get_db_session = db.get_session

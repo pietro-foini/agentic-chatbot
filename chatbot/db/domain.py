@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, Mapping
-
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Mapping
 
 
 class DBInterface(ABC):
@@ -15,11 +13,6 @@ class DBInterface(ABC):
     @abstractmethod
     async def disconnect(self) -> None:
         """Disconnect from the database"""
-        pass
-
-    @abstractmethod
-    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Yield an isolated transactional database session"""
         pass
 
     @abstractmethod

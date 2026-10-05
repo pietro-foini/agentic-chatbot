@@ -1,8 +1,7 @@
+import asyncio
 import base64
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeout
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -44,7 +43,7 @@ async def list_tables(db_name: DBName) -> str:
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -78,7 +77,7 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -116,7 +115,7 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -161,7 +160,9 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
 
 
 @tool("create_plot", args_schema=CodePlotInput, response_format="content_and_artifact")
-def create_plot(code: str, description: str, table_name: str, runtime: ToolRuntime) -> tuple[list | str, dict | None]:
+async def create_plot(
+    code: str, description: str, table_name: str, runtime: ToolRuntime
+) -> tuple[list | str, dict | None]:
     """
     Executes Python code to create a custom seaborn plot and provide an argumentative related description.
 
@@ -232,13 +233,11 @@ def create_plot(code: str, description: str, table_name: str, runtime: ToolRunti
             buf.close()
             return image_bytes
 
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_render_plot)
-            try:
-                image_bytes = future.result(timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
-            except FuturesTimeout:
-                plt.close("all")
-                return "Plot generation timed out", None
+        try:
+            image_bytes = await asyncio.wait_for(asyncio.to_thread(_render_plot), timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            plt.close("all")
+            return "Plot generation timed out", None
 
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         plt.close("all")
@@ -265,12 +264,13 @@ async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> tuple[list | str, d
     try:
         bucket_name, blob_path = re.match("gs://(.*?)/(.*)", gcs_uri).groups()
         bucket = storage_client.bucket(bucket_name)
-        blob = bucket.get_blob(blob_path)
+        blob = bucket.blob(blob_path)
 
-        if not blob.exists():
+        exists = await asyncio.to_thread(blob.exists)
+        if not exists:
             return "File not found", None
 
-        pdf_bytes = blob.download_as_bytes()
+        pdf_bytes = await asyncio.to_thread(blob.download_as_bytes)
         pdf_base64 = base64.b64encode(pdf_bytes)
         size = round(len(pdf_bytes) / 1024, 2)
 
@@ -287,7 +287,7 @@ async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> tuple[list | str, d
 
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
         blob = bucket.blob(f"downloads/{Path(blob_path).name}")
-        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
+        await asyncio.to_thread(blob.upload_from_string, pdf_bytes, content_type="application/pdf")
 
         content = [
             {"type": "text", "text": "File successfully downloaded"},
