@@ -17,7 +17,7 @@ from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.graphs.v2.agent import GRAPH
-from chatbot.llm.config import MODELS_BY_CATEGORY, get_model
+from chatbot.llm.config import CATEGORIZED_MODELS, get_model
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_assistant_response, parse_messages
@@ -77,7 +77,7 @@ async def get_chat(request: Request, thread_id: str):
             "messages": parsed_messages,
             "thread_id": thread_id,
             "threads": [str(row[0]) for row in rows],
-            "model_categories": MODELS_BY_CATEGORY,
+            "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
         },
     )
@@ -199,11 +199,11 @@ async def add_assistant_message(
         )
 
     # Define the graph configuration.
-    thread_config = RunnableConfig(
+    config = RunnableConfig(
         configurable={"thread_id": thread_id},
         recursion_limit=S.RECURSION_LIMIT,
     )
-    context_obj = Context(
+    context = Context(
         chatbot_name=S.CHATBOT_NAME,
         model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
@@ -219,8 +219,8 @@ async def add_assistant_message(
         response = await GRAPH.ainvoke(
             graph_input,
             stream_mode="values",
-            config=thread_config,
-            context=context_obj,
+            config=config,
+            context=context,
         )
     except (
         GraphRecursionError,
@@ -237,7 +237,7 @@ async def add_assistant_message(
         )
 
     # Check for interrupt.
-    state_snapshot = await GRAPH.aget_state(thread_config)
+    state_snapshot = await GRAPH.aget_state(config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
         return templates.TemplateResponse(

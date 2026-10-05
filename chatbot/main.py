@@ -5,7 +5,7 @@ from langchain_postgres import PGVectorStore
 
 from chatbot.api.routes import chat_router
 from chatbot.db.config import async_pool, pg_engine
-from chatbot.llm.embeddings import embeddings
+from chatbot.embeddings.config import embeddings
 from chatbot.settings import S
 
 
