@@ -1,8 +1,7 @@
-import uuid
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class Type(StrEnum):
