@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     DB_PORT: int = Field(description="The port of the PostgreSQL database")
     DB_NAME: str = Field(description="The PostgreSQL database name")
     TABLE_NAME_VECTORS: str = Field(
-        default="ml_vectors",
+        default="vectors",
         description="Database table used to store vector embeddings for similarity search",
     )
 
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         description="Maximum number of tokens the LLM can generate per request",
     )
     THINKING_BUDGET: int = Field(
-        default=0,
+        default=1024,
         description="Internal LLM processing budget for a single request",
     )
     TIMEOUT_LLM: int = Field(
@@ -79,6 +79,10 @@ class Settings(BaseSettings):
         default=8,
         description="Maximum seconds allowed for generated plot code to run",
     )
+
+    @property
+    def database_url(self) -> str:
+        return f"{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 S = Settings()  # type: ignore[call-arg]

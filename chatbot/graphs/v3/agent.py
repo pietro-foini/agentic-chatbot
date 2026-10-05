@@ -12,11 +12,11 @@ from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 from langgraph.store.memory import InMemoryStore
 
-from chatbot.graphs.config import postgres_checkpointer
+from chatbot.db.config import checkpointer
 from chatbot.graphs.prompts import SUPERVISOR_PROMPT
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v3.subagents import agent_1, agent_2, agent_3, agent_4
-from chatbot.llm.google import llm
+from chatbot.llm.config import get_model
 from chatbot.settings import S
 
 store = InMemoryStore()
@@ -85,11 +85,11 @@ async def dynamic_model(
 
 # noinspection PyTypeChecker
 GRAPH = create_agent(
-    model=llm,
+    model=get_model(S.MODEL_NAME),
     tools=SUPERVISOR_TOOLS,
     state_schema=State,
     context_schema=Context,
-    checkpointer=postgres_checkpointer,
+    checkpointer=checkpointer,
     store=store,
     system_prompt=SUPERVISOR_PROMPT.format(
         user_name="Pietro",

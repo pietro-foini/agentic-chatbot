@@ -1,6 +1,3 @@
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-
-from chatbot.db.config import async_pool
 from chatbot.graphs.tools import (
     create_plot,
     describe_table,
@@ -20,5 +17,3 @@ ALL_TOOLS = [
 ]
 
 SENSITIVE_TOOLS = {download_and_analyze_pdf_from_gcs.name}
-
-postgres_checkpointer = AsyncPostgresSaver(async_pool)

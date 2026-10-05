@@ -14,9 +14,8 @@ import pandas as pd
 import seaborn as sns
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
-from sqlalchemy import text
 
-from chatbot.db.config import create_readonly_async_engine
+from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.graphs.data import DBName, Source
 from chatbot.graphs.schemas import (
     CodePlotInput,
@@ -42,24 +41,25 @@ async def list_tables(db_name: DBName) -> str:
     :rtype: str
     """
 
-    engine = None
+    db = None
     try:
-        engine = create_readonly_async_engine(str(db_name))
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
         query = """
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public';
         """
-        async with engine.connect() as conn:
-            result = await conn.execute(text(query))
-            tables = [row[0] for row in result.fetchall()]
-
-        return json.dumps(tables)
+        result = await db.query(query)
+        return json.dumps(result)
     except Exception as e:
         return f"Error retrieving tables: {e}"
     finally:
-        if engine is not None:
-            await engine.dispose()
+        if db is not None:
+            await db.disconnect()
 
 
 @tool("describe_table", args_schema=DescribeTableInput, response_format="content")
@@ -75,24 +75,25 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     :rtype: str
     """
 
-    engine = None
+    db = None
     try:
-        engine = create_readonly_async_engine(str(db_name))
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
         query = """
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
             WHERE table_name = :table_name;
         """
-        async with engine.connect() as conn:
-            result = await conn.execute(text(query), {"table_name": table_name})
-            columns = [dict(row._mapping) for row in result.fetchall()]
-
-        return json.dumps(columns)
+        result = await db.query(query, {"table_name": table_name})
+        return json.dumps(result)
     except Exception as e:
         return f"Error retrieving schema: {e}"
     finally:
-        if engine is not None:
-            await engine.dispose()
+        if db is not None:
+            await db.disconnect()
 
 
 @tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content_and_artifact")
@@ -112,15 +113,17 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     :rtype: tuple[dict | str, Any]
     """
 
-    engine = None
+    db = None
     try:
-        engine = create_readonly_async_engine(str(db_name))
-        async with engine.connect() as conn:
-            result = await conn.execute(text(query))
-            rows = [dict(row._mapping) for row in result.fetchall()]
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+        result = await db.query(query)
 
         # Parse results.
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(result)
         records = df.to_dict(orient="records")
 
         # Store table on store.
@@ -153,8 +156,8 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     except Exception as e:
         return f"Error executing query: {e}", None
     finally:
-        if engine is not None:
-            await engine.dispose()
+        if db is not None:
+            await db.disconnect()
 
 
 @tool("create_plot", args_schema=CodePlotInput, response_format="content_and_artifact")

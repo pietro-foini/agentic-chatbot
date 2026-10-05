@@ -1,4 +1,3 @@
-from google.genai import types
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 
@@ -17,13 +16,6 @@ CATEGORIZED_MODELS = {
             thinking_budget=S.THINKING_BUDGET,
             timeout=S.TIMEOUT_LLM,
             include_thoughts=False,
-            safety_settings={
-                types.HarmCategory.HARM_CATEGORY_UNSPECIFIED: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
-            },
         )
         for model_name in S.GOOGLE_MODEL_NAMES
     },

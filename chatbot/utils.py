@@ -3,7 +3,7 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from more_itertools import split_before
 
-from chatbot.data import AssistantResponse, Attachment, ThinkingStep, UserResponse
+from chatbot.schemas import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
 
 def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | AssistantResponse]:

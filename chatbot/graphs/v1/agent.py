@@ -3,7 +3,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import RetryPolicy
 
-from chatbot.graphs.config import postgres_checkpointer
+from chatbot.db.config import checkpointer
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v1.nodes import call_model, call_tool, should_continue
 from chatbot.settings import S
@@ -38,4 +38,4 @@ def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
 
 
 # Create the graph instance.
-GRAPH = create_agent_graph(max_attempts=S.MAX_ATTEMPTS, checkpointer=postgres_checkpointer)
+GRAPH = create_agent_graph(max_attempts=S.MAX_ATTEMPTS, checkpointer=checkpointer)

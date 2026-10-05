@@ -1,39 +1,24 @@
-from langchain_postgres import PGEngine
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
-from sqlalchemy.ext.asyncio import create_async_engine
 
+from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.settings import S
 
-# Async connection pool.
-async_pool = AsyncConnectionPool(
-    conninfo=f"postgresql://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{S.DB_NAME}",
-    max_size=10,
-    min_size=1,
+# Strictly required by LangGraph (AsyncPostgresSaver).
+pool = AsyncConnectionPool(
+    conninfo=f"postgresql://{S.database_url}",
     open=False,
+    kwargs={
+        "autocommit": True,
+        "prepare_threshold": 0,
+    },
 )
-# Async pg engine.
-engine = create_async_engine(
-    f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{S.DB_NAME}",
-    pool_size=5,
-    max_overflow=5,
-    pool_pre_ping=True,
+checkpointer = AsyncPostgresSaver(pool)
+
+# Required by langchain-postgres (PGEngine / PGVectorStore) and authentication.
+db = PostgresAsyncHandler(
+    db_uri=f"postgresql+asyncpg://{S.database_url}",
+    readonly=False,
+    statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
 )
-pg_engine = PGEngine.from_engine(engine=engine)
-
-
-def create_readonly_async_engine(db_name: str):
-    """Create a short-lived async engine forced to read-only with a statement timeout"""
-
-    db_uri = (
-        f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}" f"@{S.DB_HOST}:{S.DB_PORT}/{db_name}"
-    )
-
-    return create_async_engine(
-        db_uri,
-        connect_args={
-            "server_settings": {
-                "default_transaction_read_only": "on",
-                "statement_timeout": str(S.SQL_STATEMENT_TIMEOUT_MS),
-            }
-        },
-    )
+get_db_session = db.get_session

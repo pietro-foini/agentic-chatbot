@@ -11,18 +11,18 @@ from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 
-from chatbot.data import Attachment, UserResponse
-from chatbot.db.config import async_pool
+from chatbot.db.config import pool
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.graphs.v2.agent import GRAPH
 from chatbot.llm.config import CATEGORIZED_MODELS, get_model
+from chatbot.schemas import Attachment, UserResponse
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_assistant_response, parse_messages
 
-chat_router = APIRouter()
+chat_router = APIRouter(tags=["Chat"])
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent.parent / "templates"))
 
@@ -41,7 +41,7 @@ async def delete_chats():
     """Delete all the chat threads"""
 
     # Delete all the data referring to the persistent memory stored on database.
-    async with async_pool.connection() as conn:
+    async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
                 "TRUNCATE TABLE checkpoints, checkpoint_writes, checkpoint_blobs, checkpoint_migrations RESTART IDENTITY CASCADE;"
@@ -65,7 +65,7 @@ async def get_chat(request: Request, thread_id: str):
     parsed_messages = parse_messages(messages)
 
     # Retrieve the list of all the threads in order to visualize them into the chronology.
-    async with async_pool.connection() as conn:
+    async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute("SELECT DISTINCT thread_id FROM checkpoints;")
             rows = await cur.fetchall()

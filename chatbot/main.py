@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from langchain_postgres import PGVectorStore
+from langchain_postgres import PGEngine, PGVectorStore
 
 from chatbot.api.routes import chat_router
-from chatbot.db.config import async_pool, engine, pg_engine
+from chatbot.db.config import checkpointer, db, pool
 from chatbot.embeddings.config import embeddings
 from chatbot.settings import S
 
@@ -13,23 +13,30 @@ from chatbot.settings import S
 async def lifespan(app: FastAPI):
     """Define the startup and shutdown logic"""
 
-    # Open pool at the application startup.
-    await async_pool.open()
+    # Open connections at the application startup.
+    await pool.open()
+    await db.connect()
+
+    # Create tables if they do not exist.
+    await db.init_db()
+    await checkpointer.setup()
 
     # Initialize Vector Database.
     vector_store = await PGVectorStore.create(
-        engine=pg_engine,
+        engine=PGEngine.from_engine(engine=db.engine),
         table_name=S.TABLE_NAME_VECTORS,
         embedding_service=embeddings,
         metadata_columns=["source"],
     )
+
+    app.state.db = db
     app.state.vector_store = vector_store
 
     yield
 
-    # Close pool at the application stop.
-    await async_pool.close()
-    await engine.dispose()
+    # Close connections at the application shutdown.
+    await pool.close()
+    await db.disconnect()
 
 
 app = FastAPI(
@@ -37,4 +44,4 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(chat_router, tags=["Chat"])
+app.include_router(chat_router)

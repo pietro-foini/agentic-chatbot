@@ -20,7 +20,8 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
-from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS, postgres_checkpointer
+from chatbot.db.config import checkpointer
+from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
 from chatbot.llm.config import get_model
 from chatbot.settings import S
@@ -107,7 +108,7 @@ GRAPH = create_agent(
     tools=ALL_TOOLS,
     state_schema=State,
     context_schema=Context,
-    checkpointer=postgres_checkpointer,
+    checkpointer=checkpointer,
     store=store,
     middleware=[
         inject_dynamic_prompt,
