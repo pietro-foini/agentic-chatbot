@@ -264,7 +264,7 @@ async def add_assistant_message(
         chatbot_name=S.CHATBOT_NAME,
         model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
-            user_name=current_user.full_name or "User",
+            user_name=current_user.username or "user",
             bot_name=S.CHATBOT_NAME,
         ),
         tools=ALL_TOOLS,
