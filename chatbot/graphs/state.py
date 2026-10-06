@@ -1,20 +1,18 @@
 import operator
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Required, TypedDict
 
-from langchain.agents import AgentState
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AnyMessage
 from langchain_core.tools import BaseTool
 from langchain_postgres import PGVectorStore
-
-__all__ = [
-    "State",
-    "Context",
-]
+from langgraph.graph import add_messages
 
 
-class State(AgentState):
+class State(TypedDict):
     """Agent state"""
+
+    messages: Required[Annotated[list[AnyMessage], add_messages]]
 
     total_input_tokens: Annotated[int, operator.add]
     total_output_tokens: Annotated[int, operator.add]
