@@ -24,6 +24,7 @@ class State(AgentState):
 class Context:
     """Context configuration for Agent runtime call"""
 
+    thread_id: str
     chatbot_name: str
     system_prompt: str
     model: BaseChatModel

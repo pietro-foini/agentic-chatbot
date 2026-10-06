@@ -3,32 +3,37 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from more_itertools import split_before
 
+from chatbot.db.config import store
 from chatbot.schemas import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
 
-def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | AssistantResponse]:
+async def parse_messages(
+    thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]
+) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
 
     :param messages: the input conversation messages
+    :param thread_id: the ID of the thread
     :return: the parsed conversation messages
     """
 
     parsed_messages = []
 
     for group in split_before(messages, lambda m: isinstance(m, HumanMessage)):
-        user_response = extract_user_response(group)
-        bot_response = extract_assistant_response(group)
+        user_response = await extract_user_response(thread_id, group)
+        bot_response = await extract_assistant_response(thread_id, group)
         parsed_messages.extend((user_response, bot_response))
 
     return parsed_messages
 
 
-def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> UserResponse:
+async def extract_user_response(thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]) -> UserResponse:
     """
     Extract the user response.
 
     :param messages: the input conversation messages
+    :param thread_id: the ID of the thread
     :return: the user response
     """
 
@@ -71,11 +76,14 @@ def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]
     return response
 
 
-def extract_assistant_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> AssistantResponse:
+async def extract_assistant_response(
+    thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]
+) -> AssistantResponse:
     """
     Extract the assistant response.
 
     :param messages: the input conversation messages
+    :param thread_id: the ID of the thread
     :return: the assistant response
     """
 
@@ -87,12 +95,15 @@ def extract_assistant_response(messages: list[HumanMessage | ToolMessage | AIMes
         if isinstance(msg, ToolMessage):
             elapsed = msg.response_metadata.get("elapsed_time", 0)
             response.thinking.append(ThinkingStep(step_name=f"Tool Response ({elapsed}s)", details=str(msg.content)))
-            if msg.artifact and msg.artifact.get("type") == "image":
-                response.image = msg.artifact["base64"]
-            if msg.artifact and msg.artifact.get("type") == "table":
-                response.table = msg.artifact["base64"]
-            if msg.artifact and msg.artifact.get("type") == "pdf":
-                response.pdf = msg.artifact["base64"]
+            if msg.artifact and msg.artifact.get("mime_type") == "image/png":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["file_id"])
+                response.image = item.value["data"]
+            if msg.artifact and msg.artifact.get("mime_type") == "text/csv":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["table_name"])
+                response.table = item.value["data"]
+            if msg.artifact and msg.artifact.get("mime_type") == "application/pdf":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["file_id"])
+                response.pdf = item.value["data"]
 
         elif isinstance(msg, AIMessage):
             if msg.id:

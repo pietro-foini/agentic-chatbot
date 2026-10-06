@@ -1,9 +1,8 @@
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.store.memory import InMemoryStore
 from langgraph.types import RetryPolicy
 
-from chatbot.db.config import checkpointer
+from chatbot.db.config import checkpointer, store
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v1.nodes import call_model, call_tool, should_continue
 from chatbot.settings import S
@@ -11,9 +10,6 @@ from chatbot.settings import S
 
 def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
     """Construct and compile the agent graph."""
-
-    # Create store for RAM purposes (for tools information at the moment).
-    store = InMemoryStore()
 
     # Define a new graph with state
     workflow = StateGraph(state_schema=State, context_schema=Context)

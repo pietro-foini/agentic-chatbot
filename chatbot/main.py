@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from langchain_postgres import PGVectorStore
 
 from chatbot.api.routes import auth_router, chat_router
-from chatbot.db.config import db, pg_engine, pool
+from chatbot.db.config import connection_pool, db, pg_engine
 from chatbot.embeddings.config import embeddings
 from chatbot.settings import S
 
@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     """Define the startup and shutdown logic"""
 
     # Open connections at the application startup.
-    await pool.open()
+    await connection_pool.open()
     await db.connect()
 
     try:
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
         )
         yield
     finally:  # Close connections at the application shutdown or crash.
-        await pool.close()
+        await connection_pool.close()
         await db.disconnect()
 
 

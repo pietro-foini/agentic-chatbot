@@ -16,16 +16,13 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
-from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
-from chatbot.db.config import checkpointer
+from chatbot.db.config import checkpointer, store
 from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
 from chatbot.llm.config import get_model
 from chatbot.settings import S
-
-store = InMemoryStore()
 
 
 @dynamic_prompt

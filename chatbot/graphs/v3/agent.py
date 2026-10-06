@@ -10,16 +10,13 @@ from langchain.agents.middleware import (
 )
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
-from langgraph.store.memory import InMemoryStore
 
-from chatbot.db.config import checkpointer
+from chatbot.db.config import checkpointer, store
 from chatbot.graphs.prompts import SUPERVISOR_PROMPT
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v3.subagents import agent_1, agent_2, agent_3, agent_4
 from chatbot.llm.config import get_model
 from chatbot.settings import S
-
-store = InMemoryStore()
 
 
 @tool

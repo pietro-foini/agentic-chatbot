@@ -54,6 +54,18 @@ async def delete_chats(
 
     await session.execute(
         text("""
+            DELETE FROM store 
+            WHERE prefix IN (
+                SELECT 'artifacts.' || thread_id 
+                FROM checkpoints 
+                WHERE metadata ->> 'user_id' = :user_id
+            );
+        """),
+        {"user_id": str(current_user.id)},
+    )
+
+    await session.execute(
+        text("""
             DELETE FROM checkpoint_writes 
             WHERE thread_id IN (
                 SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id
@@ -113,7 +125,7 @@ async def get_chat(
             )
 
     # Parse messages for UI rendering purposes.
-    parsed_messages = parse_messages(messages)
+    parsed_messages = await parse_messages(thread_id, messages)
 
     # Retrieve the list of all the threads specific for the user in order to visualize them into the chronology.
     query = text("SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id;")
@@ -261,6 +273,7 @@ async def add_assistant_message(
         recursion_limit=S.RECURSION_LIMIT,
     )
     context = Context(
+        thread_id=thread_id,
         chatbot_name=S.CHATBOT_NAME,
         model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
@@ -315,7 +328,7 @@ async def add_assistant_message(
     messages = messages[start_idx:]
 
     # Create assistant response.
-    assistant_message = extract_assistant_response(messages)
+    assistant_message = await extract_assistant_response(thread_id, messages)
 
     return templates.TemplateResponse(
         request=request,

@@ -29,8 +29,8 @@ class SQLQueryInput(BaseModel):
     db_name: DBName = Field(
         description="The name of the database to user for applying the query",
     )
-    table_name: str = Field(
-        description="A unique name to store this result. Use descriptive names like 'sales_data' or 'user_metrics'",
+    ref_table_name: str = Field(
+        description="A unique logical name to store this result used as reference in subsequent tool calls. Use descriptive names like 'sales_data' or 'user_metrics'",
     )
 
     @field_validator("query", mode="before")
@@ -44,7 +44,7 @@ class SQLQueryInput(BaseModel):
 class CodePlotInput(BaseModel):
     """Input schema for generating plots from Python code"""
 
-    table_name: str = Field(description="The name of the table stored in the store object to use for this plot")
+    ref_table_name: str = Field(description="The name of the table stored in the store object to use for this plot")
     code: str = Field(description="""
         Python code using seaborn to create a beautiful, publication-ready plot. 
 
