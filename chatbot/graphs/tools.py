@@ -174,7 +174,7 @@ async def create_plot(
     item = await runtime.store.aget(namespace=("artifacts", runtime.context.thread_id), key=ref_table_name)
 
     if item is None:
-        return f"Table '{ref_table_name}' not found. Please run execute_sql first.", None
+        return f"Table '{ref_table_name}' not found.", None
 
     df = pd.DataFrame(item.value["records"])
 

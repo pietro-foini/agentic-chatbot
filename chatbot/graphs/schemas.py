@@ -3,7 +3,7 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 from chatbot.graphs.data import DBName, Source
-from chatbot.graphs.security import validate_plot_code, wrap_sql_with_limit
+from chatbot.graphs.security import wrap_sql_with_limit
 from chatbot.settings import S
 
 
@@ -45,30 +45,9 @@ class CodePlotInput(BaseModel):
     """Input schema for generating plots from Python code"""
 
     ref_table_name: str = Field(description="The name of the table stored in the store object to use for this plot")
-    code: str = Field(description="""
-        Python code using seaborn to create a beautiful, publication-ready plot. 
-
-        CRITICAL INSTRUCTIONS:
-        - A pandas DataFrame named `df` is already injected at runtime. DO NOT create or modify any data.
-        - Do NOT generate any synthetic data or DataFrames.
-        - Only generate code that manipulates `df` to produce the plot.
-        - Do NOT import libraries (pd, sns, plt are pre-loaded).
-
-        REQUIRED STYLING GUIDELINES:
-        - Use seaborn style: sns.set_style('whitegrid') for better readability
-        - Set figure size appropriately: plt.figure(figsize=(12, 6)) for wide plots or (10, 8) for square plots
-        - Use seaborn color palettes: sns.color_palette('husl'), 'Set2', 'deep', or 'muted'
-        - Add clear, descriptive labels: plt.xlabel('Label', fontsize=12, fontweight='bold')
-        - Add informative title: plt.title('Title', fontsize=14, fontweight='bold', pad=20)
-        - Rotate x-axis labels if needed: plt.xticks(rotation=45, ha='right')
-        - Add grid for better readability: plt.grid(True, alpha=0.3, linestyle='--')
-        - Use tight layout: plt.tight_layout() to prevent label cutoff
-        - Set appropriate font sizes: use fontsize=11 for axis labels, fontsize=10 for tick labels
-        - For categorical plots, consider using palette parameter in seaborn functions
-        - Add legends when multiple series: plt.legend(fontsize=10, frameon=True, shadow=True)
-        - Use despine for cleaner look: sns.despine() to remove top and right spines
-        - Set background color if needed: fig.patch.set_facecolor('white')
-        """)
+    code: str = Field(
+        description="Python plotting code only. A populated pandas DataFrame named `df` is ALREADY loaded. DO NOT create, mock, or import `df` or any data. Use `df` directly with sns/plt. Do NOT import libraries (pd, sns, plt are pre-loaded)."
+    )
     description: str = Field(description="A brief argumentative and not technical description of the generated plot")
 
     @field_validator("code", mode="after")
@@ -77,7 +56,6 @@ class CodePlotInput(BaseModel):
         code = re.sub(r"^import\s+.*$", "", code, flags=re.MULTILINE)
         code = re.sub(r"^from\s+.*\s+import\s+.*$", "", code, flags=re.MULTILINE)
         code = code.strip()
-        validate_plot_code(code)
         return code
 
 
