@@ -75,7 +75,8 @@ async def register_form_submit(
             status_code=400,
         )
 
-    access_token = create_access_token(data={"sub": new_user.username})
+    access_token = create_access_token(data={"sub": new_user.id})
+
     response = RedirectResponse(url="/", status_code=303)
     response.set_cookie(
         key="access_token",
@@ -108,7 +109,7 @@ async def login_form_submit(
             status_code=400,
         )
 
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.id})
 
     redirect = RedirectResponse(url="/", status_code=303)
     redirect.set_cookie(

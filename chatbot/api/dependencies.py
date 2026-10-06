@@ -60,6 +60,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_current_user(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     access_token_cookie: Annotated[str | None, Cookie(alias="access_token")] = None,
 ) -> UserModel:
@@ -69,24 +70,30 @@ async def get_current_user(
 
     try:
         payload = jwt.decode(token, S.SECRET_KEY, algorithms=[S.ALGORITHM])
-        username = payload.get("sub")
-        if username is None:
+        user_id = payload.get("sub")
+        if user_id is None:
+            if request.headers.get("HX-Request"):
+                raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
             raise HTTPException(
                 status_code=303,
                 headers={"Location": "/login"},
             )
     except InvalidTokenError:
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
         raise HTTPException(
             status_code=303,
             headers={"Location": "/login"},
         )
 
     # Retrieve the current user if it is not disabled.
-    query = select(UserModel).where(UserModel.username == username, UserModel.is_active.is_(True))
+    query = select(UserModel).where(UserModel.id == user_id, UserModel.is_active.is_(True))
     result = await session.execute(query)
 
     current_user = result.scalar_one_or_none()
     if not current_user:
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
         raise HTTPException(
             status_code=303,
             headers={"Location": "/login"},

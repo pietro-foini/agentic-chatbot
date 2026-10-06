@@ -15,7 +15,8 @@ from langchain_postgres import PGVectorStore
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, StateSnapshot
-from sqlalchemy import text
+from sqlalchemy import delete, select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.api.dependencies import (
@@ -26,7 +27,7 @@ from chatbot.api.dependencies import (
     get_session,
     get_vector_store,
 )
-from chatbot.db.models import UserModel
+from chatbot.db.models import ThreadModel, UserModel
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
@@ -42,13 +43,13 @@ chat_router = APIRouter(tags=["Chat"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent.parent / "templates"))
 
 
-@chat_router.get(path="/", dependencies=[Depends(get_current_user)])
+@chat_router.get(path="/", dependencies=[Depends(get_current_user)], include_in_schema=False)
 async def new_chat():
     """Create a new chat"""
 
     thread_id = uuid.uuid4()
 
-    return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
+    return RedirectResponse(url=f"/chat/{thread_id}", status_code=303, headers={"Cache-Control": "no-store"})
 
 
 @chat_router.delete(path="/chat")
@@ -95,6 +96,7 @@ async def delete_chats(
         """),
         {"user_id": str(current_user.id)},
     )
+    await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
 
     response = HTMLResponse()
     response.headers["HX-Redirect"] = "/"
@@ -124,9 +126,13 @@ async def get_chat(
     # Parse messages for UI rendering purposes.
     parsed_messages = await parse_messages(str(thread_id), messages)
 
-    # Retrieve the list of all the threads of the current user in order to visualize them into the sidebar chronology.
-    query = text("SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id;")
-    result = await session.execute(query, {"user_id": str(current_user.id)})
+    # Retrieve the list of all the threads of the current user.
+    query = (
+        select(ThreadModel.thread_id)
+        .where(ThreadModel.user_id == str(current_user.id))
+        .order_by(ThreadModel.created_at.desc())
+    )
+    threads = (await session.execute(query)).scalars().all()
 
     return templates.TemplateResponse(
         request=request,
@@ -134,7 +140,7 @@ async def get_chat(
         context={
             "messages": parsed_messages,
             "thread_id": str(thread_id),
-            "threads": [str(row[0]) for row in result.all()],
+            "threads": [str(t_id) for t_id in threads],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
             "chat_cost": f"${cost_amount:.5f}",
@@ -147,7 +153,8 @@ async def add_user_message(
     request: Request,
     thread_id: uuid.UUID,
     current_user: Annotated[UserModel, Depends(get_current_user)],
-    message: str = Form(...),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    message: str = Form(..., max_length=4000),
     file: UploadFile | None = File(None),
 ):
     """Post a user message to the chat history for the given ID thread"""
@@ -177,7 +184,7 @@ async def add_user_message(
         # Download file.
         content_bytes = await file.read()
 
-        # Upload su Google Cloud Storage in order to keep them tracked.
+        # Upload on Google Cloud Storage in order to keep them tracked.
         safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
         filename = f"{uuid.uuid4()}_{safe_name}"
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
@@ -199,6 +206,17 @@ async def add_user_message(
         content=message,
         attachment=attachment,
     )
+
+    # Add valid thread information to the thread table if not already exists.
+    stmt = (
+        insert(ThreadModel)
+        .values(
+            thread_id=thread_id,
+            user_id=str(current_user.id),
+        )
+        .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
+    )
+    await session.execute(stmt)
 
     return templates.TemplateResponse(
         request=request,
@@ -308,7 +326,7 @@ async def add_assistant_message(
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": f"A system error occurred while processing your request. Please try again in a moment."},
+            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
         )
 
     # Check for interrupt.
