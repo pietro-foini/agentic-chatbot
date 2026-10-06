@@ -299,7 +299,7 @@ async def download_and_analyze_pdf_from_gcs(
     # Format the output: content and artifact.
     content = [
         {"type": "text", "text": "File successfully downloaded"},
-        {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
+        {"type": "file", "url": gcs_uri, "mime_type": "application/pdf"},
     ]
     artifact_data = {"file_id": file_id, "mime_type": "application/pdf"}
 
