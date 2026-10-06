@@ -11,9 +11,7 @@ def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> li
     Parse the conversation sequence.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
     :return: the parsed conversation messages
-    :rtype: list[UserResponse | AssistantResponse]
     """
 
     parsed_messages = []
@@ -31,9 +29,7 @@ def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]
     Extract the user response.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
     :return: the user response
-    :rtype: UserResponse
     """
 
     response = UserResponse(id=str(uuid.uuid4()), name="User", content="")
@@ -80,9 +76,7 @@ def extract_assistant_response(messages: list[HumanMessage | ToolMessage | AIMes
     Extract the assistant response.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
     :return: the assistant response
-    :rtype: AssistantResponse
     """
 
     response = AssistantResponse(id=str(uuid.uuid4()), name="AI Assistant", content="")

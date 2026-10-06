@@ -35,9 +35,7 @@ async def list_tables(db_name: DBName) -> str:
     Retrieve a list of all available tables in a specified PostgreSQL database.
 
     :param db_name: name of the database to list tables from
-    :type db_name: DBName
     :return: list of table names
-    :rtype: str
     """
 
     db = None
@@ -67,11 +65,8 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     Retrieve information about a PostgreSQL table, like information, schema and column details.
 
     :param db_name: name of the database containing the table
-    :type db_name: DBName
     :param table_name: the name of the table to search info about
-    :type table_name: str
     :return: the table information
-    :rtype: str
     """
 
     db = None
@@ -101,15 +96,10 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     Executes a SQL query on PostgreSQL and returns the result as a parsed table.
 
     :param query: the SQL query to execute on PostgreSQL
-    :type query: str
     :param db_name: name of the database to user for applying the query
-    :type db_name: str
     :param table_name: logical name assigned to the resulting table, used to reference in subsequent tool calls
-    :type table_name: str
     :param runtime: the runtime (parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: query results as a JSON table, with a table artifact
-    :rtype: tuple[dict | str, Any]
     """
 
     db = None
@@ -167,15 +157,10 @@ async def create_plot(
     Executes Python code to create a custom seaborn plot and provide an argumentative related description.
 
     :param code: Python code using seaborn to create a plot starting from provided data
-    :type code: str
     :param description: a brief description of the generated graph
-    :type description: str
     :param table_name: the name of the table stored in the store object to use for this plot
-    :type table_name: str
     :param runtime: the runtime (parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: graph description, with a Base64 encoded PNG image artifact
-    :rtype: tuple[list | str, dict | None]
     """
 
     matplotlib.use("Agg")
@@ -256,9 +241,7 @@ async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> tuple[list | str, d
     Retrieve, download and analyze a single PDF file from Google Cloud Storage.
 
     :param gcs_uri: Google Cloud Storage URI in format 'gs://bucket-name/path/to/file.pdf'
-    :type gcs_uri: str
     :return: message, with a Base64 encoded PDF artifact
-    :rtype: tuple[list | str, dict | None]
     """
 
     try:
@@ -308,13 +291,9 @@ async def retrieve_information(query: str, source: Source, runtime: ToolRuntime)
     - `unimatica`: contains information about italian CCNL Unimatica contract.
 
     :param query: the query to use for retrieving information from documentation
-    :type query: str
     :param source: the knowledge source to query
-    :type source: Source
     :param runtime: the runtime (the parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: the information extracted from the source
-    :rtype: str
     """
 
     try:
