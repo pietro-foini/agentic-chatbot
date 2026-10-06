@@ -5,6 +5,13 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Store here environment variables"""
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
     # Authentication.
     SECRET_KEY: str = Field(description="The secret key for the authentication")
     ALGORITHM: str = Field(default="HS256", description="The algorithm to use for authentication")
