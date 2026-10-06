@@ -13,16 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.db.config import db
 from chatbot.db.models import UserModel
-from chatbot.graphs.v2.agent import GRAPH
 from chatbot.settings import S
 
 ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg"}
 
 
-def get_graph() -> CompiledStateGraph:
+def get_graph(request: Request) -> CompiledStateGraph:
     """Return the compiled graph"""
 
-    return GRAPH
+    return request.app.state.graph
 
 
 async def get_owned_thread_state(
