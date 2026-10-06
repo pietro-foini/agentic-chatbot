@@ -51,7 +51,7 @@ async def new_chat():
     return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
 
 
-@chat_router.delete(path="/chat", dependencies=[Depends(get_owned_thread_state)])
+@chat_router.delete(path="/chat")
 async def delete_chats(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
