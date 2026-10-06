@@ -43,7 +43,7 @@ async def list_tables(db_name: DBName) -> str:
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -77,7 +77,7 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -115,7 +115,7 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     db = None
     try:
         db = PostgresAsyncHandler(
-            db_uri=f"{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )

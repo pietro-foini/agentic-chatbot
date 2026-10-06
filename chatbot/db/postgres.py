@@ -10,7 +10,7 @@ from chatbot.db.models import Base
 
 
 class PostgresAsyncHandler(DBInterface):
-    """PostgreSQL async implementation using SQLAlchemy and asyncpg."""
+    """PostgreSQL async implementation using SQLAlchemy and asyncpg"""
 
     def __init__(
         self,
@@ -27,11 +27,11 @@ class PostgresAsyncHandler(DBInterface):
             server_settings["default_transaction_read_only"] = "on"
 
         self.engine: AsyncEngine = create_async_engine(
-            f"postgresql+asyncpg://{db_uri}",
+            db_uri,
             connect_args={"server_settings": server_settings},
             pool_pre_ping=True,
         )
-        self.session = async_sessionmaker(
+        self.session_factory = async_sessionmaker(
             bind=self.engine,
             class_=AsyncSession,
             expire_on_commit=False,
@@ -42,7 +42,7 @@ class PostgresAsyncHandler(DBInterface):
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Provides a transactional scope around a series of operations"""
 
-        async with self.session() as session:
+        async with self.session_factory() as session:
             try:
                 yield session
                 await session.commit()
@@ -53,11 +53,8 @@ class PostgresAsyncHandler(DBInterface):
     async def init_db(self) -> None:
         """Create all tables defined in Base.metadata if they do not exist"""
 
-        def _create_tables(sync_conn: Connection) -> None:
-            Base.metadata.create_all(bind=sync_conn)
-
         async with self.engine.begin() as conn:
-            await conn.run_sync(_create_tables)
+            await conn.run_sync(Base.metadata.create_all)
 
     async def connect(self) -> None:
         """Verify the connection is alive"""

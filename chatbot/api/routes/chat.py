@@ -100,7 +100,7 @@ async def get_chat(
     # Retrieve costs.
     in_tokens = state.values.get("total_input_tokens", 0) if state and hasattr(state, "values") else 0
     out_tokens = state.values.get("total_output_tokens", 0) if state and hasattr(state, "values") else 0
-    cost_amount = compute_cost(in_tokens, out_tokens)
+    cost_amount = compute_cost(S.MODEL_NAME, in_tokens, out_tokens)  # TODO: adjust
 
     # Security check if the thread belongs to another user.
     if state and state.metadata:
@@ -307,7 +307,7 @@ async def add_assistant_message(
     in_tokens = state_snapshot.values.get("total_input_tokens", 0)
     out_tokens = state_snapshot.values.get("total_output_tokens", 0)
 
-    cost_amount = compute_cost(in_tokens, out_tokens)
+    cost_amount = compute_cost(model_name or S.MODEL_NAME, in_tokens, out_tokens)
 
     # Get messages.
     messages = response["messages"]

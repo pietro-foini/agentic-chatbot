@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Store here env variable"""
+    """Store here environment variables"""
 
     # Authentication.
     SECRET_KEY: str = Field(description="The secret key for the authentication")
@@ -14,7 +14,6 @@ class Settings(BaseSettings):
 
     # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
-    REGION: str = Field(description="The region of the Google Cloud Platform project")
 
     # Google Cloud Storage.
     GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
@@ -23,17 +22,23 @@ class Settings(BaseSettings):
     # Default.
     MODEL_NAME: str = Field(default="gemini-2.5-flash-lite", description="The default LLM model")
     # Google.
-    GOOGLE_MODEL_NAMES: list[str] = Field(
-        default=["gemini-2.5-flash-lite"], description="The names of the Google LLM models"
+    GOOGLE_MODELS: dict[str, str] = Field(
+        default={
+            "gemini-2.5-flash-lite": "europe-west1",
+            "gemini-3.5-flash-lite": "global",
+            "gemini-3.8-flash": "global",
+        },
+        description="The available Google LLM models with the corresponding region",
     )
     # Ollama.
-    OLLAMA_MODEL_NAMES: list[str] = Field(
+    OLLAMA_MODELS: list[str] = Field(
         default=["qwen2.5:7b", "gemma4:12b"], description="The names of the Ollama LLM models"
     )
 
     # Embeddings.
     # Default.
     EMBEDDINGS_NAME: str = Field(default="bge-m3:latest", description="The name of the embedding model")
+    EMBEDDINGS_SIZE: int = Field(default=1024, description="The size of the embedding model")
 
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")
@@ -86,10 +91,6 @@ class Settings(BaseSettings):
         default=8,
         description="Maximum seconds allowed for generated plot code to run",
     )
-
-    @property
-    def database_url(self) -> str:
-        return f"{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 S = Settings()  # type: ignore[call-arg]

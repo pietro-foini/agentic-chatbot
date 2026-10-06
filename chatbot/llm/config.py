@@ -8,7 +8,7 @@ CATEGORIZED_MODELS = {
         model_name: ChatGoogleGenerativeAI(
             model=model_name,
             project=S.PROJECT_ID,
-            location=S.REGION,
+            location=region,
             vertexai=True,
             temperature=S.TEMPERATURE,
             max_tokens=S.MAX_TOKENS,
@@ -17,14 +17,14 @@ CATEGORIZED_MODELS = {
             timeout=S.TIMEOUT_LLM,
             include_thoughts=False,
         )
-        for model_name in S.GOOGLE_MODEL_NAMES
+        for model_name, region in S.GOOGLE_MODELS.items()
     },
     "Open-Source": {
         model_name: ChatOllama(
             model=model_name,
             temperature=S.TEMPERATURE,
         )
-        for model_name in S.OLLAMA_MODEL_NAMES
+        for model_name in S.OLLAMA_MODELS
     },
 }
 
