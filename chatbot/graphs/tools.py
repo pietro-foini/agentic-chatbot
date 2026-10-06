@@ -96,7 +96,7 @@ async def execute_sql(query: str, db_name: str, table_name: str, runtime: ToolRu
     Executes a SQL query on PostgreSQL and returns the result as a parsed table.
 
     :param query: the SQL query to execute on PostgreSQL
-    :param db_name: name of the database to user for applying the query
+    :param db_name: name of the database to use for applying the query
     :param table_name: logical name assigned to the resulting table, used to reference in subsequent tool calls
     :param runtime: the runtime (parameter is not visible to the model)
     :return: query results as a JSON table, with a table artifact
@@ -238,57 +238,50 @@ async def create_plot(
 @tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
 async def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> tuple[list | str, dict | None]:
     """
-    Retrieve, download and analyze a single PDF file from Google Cloud Storage.
+    Download and analyze a single PDF file from Google Cloud Storage.
 
     :param gcs_uri: Google Cloud Storage URI in format 'gs://bucket-name/path/to/file.pdf'
-    :return: message, with a Base64 encoded PDF artifact
+    :return: the retrieved PDF URL and a Base64 encoded PDF artifact
     """
 
-    try:
-        bucket_name, blob_path = re.match("gs://(.*?)/(.*)", gcs_uri).groups()
-        bucket = storage_client.bucket(bucket_name)
-        blob = bucket.blob(blob_path)
+    if not (match := re.match(pattern="gs://(.*?)/(.*)", string=gcs_uri)):
+        return "Not valid GCS URI", None
 
-        exists = await asyncio.to_thread(blob.exists)
-        if not exists:
-            return "File not found", None
+    bucket_name, blob_path = match.groups()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_path)
 
-        pdf_bytes = await asyncio.to_thread(blob.download_as_bytes)
-        pdf_base64 = base64.b64encode(pdf_bytes)
-        size = round(len(pdf_bytes) / 1024, 2)
+    exists = await asyncio.to_thread(blob.exists)
+    if not exists:
+        return "File not found", None
 
-        artifact_data = {"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"}
+    await asyncio.to_thread(blob.reload)
+    size_kb = round(blob.size / 1024, 2)
+    if size_kb > S.MAX_ATTACHMENTS_SIZE:
+        return "File exceeds size limit and was not downloaded", None
 
-        if size > S.MAX_ATTACHMENTS_SIZE:
-            content = [
-                {
-                    "type": "text",
-                    "text": "File successfully downloaded, but it cannot be analyzed because it exceeds size limit",
-                }
-            ]
-            return content, artifact_data
+    pdf_bytes = await asyncio.to_thread(blob.download_as_bytes)
+    pdf_base64 = base64.b64encode(pdf_bytes)
 
-        bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
-        blob = bucket.blob(f"downloads/{Path(blob_path).name}")
-        await asyncio.to_thread(blob.upload_from_string, pdf_bytes, content_type="application/pdf")
+    artifact_data = {"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"}
 
-        content = [
-            {"type": "text", "text": "File successfully downloaded"},
-            {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
-        ]
-        return content, artifact_data
+    # bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
+    # blob = bucket.blob(f"downloads/{Path(blob_path).name}")
+    # await asyncio.to_thread(blob.upload_from_string, pdf_bytes, content_type="application/pdf")
 
-    except Exception as e:
-        return f"Error processing file: {e}", None
+    content = [
+        {"type": "text", "text": "File successfully downloaded"},
+        {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
+    ]
+
+    return content, artifact_data
 
 
 @tool("retrieve_information", args_schema=RAGInput, response_format="content")
 async def retrieve_information(query: str, source: Source, runtime: ToolRuntime) -> str:
     """
     Retrieve relevant information from a knowledge source using a RAG (Retrieval-Augmented Generation) approach.
-    This tool searches a vector store to find content related to a user query. Currently, the supported sources are:
-
-    - `unimatica`: contains information about italian CCNL Unimatica contract.
+    This tool searches a vector store to find content related to a user query.
 
     :param query: the query to use for retrieving information from documentation
     :param source: the knowledge source to query
@@ -296,8 +289,6 @@ async def retrieve_information(query: str, source: Source, runtime: ToolRuntime)
     :return: the information extracted from the source
     """
 
-    try:
-        docs = await runtime.context.vector_store.asimilarity_search(query, filter={"source": {"$eq": source.value}})
-        return "\n\n".join([doc.page_content for doc in docs])
-    except Exception as e:
-        return f"Error retrieving information: {e}"
+    docs = await runtime.context.vector_store.asimilarity_search(query, filter={"source": {"$eq": source.value}})
+
+    return "\n\n".join([doc.page_content for doc in docs])
