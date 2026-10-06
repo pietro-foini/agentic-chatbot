@@ -1,9 +1,10 @@
 import asyncio
+import re
 import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from google.genai.errors import ServerError
@@ -12,16 +13,23 @@ from langchain_core.runnables import RunnableConfig
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_postgres import PGVectorStore
 from langgraph.errors import GraphRecursionError
-from langgraph.types import Command
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command, StateSnapshot
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chatbot.api.dependencies import get_current_user, get_session, get_vector_store
+from chatbot.api.dependencies import (
+    ALLOWED_MIME_TYPES,
+    get_current_user,
+    get_graph,
+    get_owned_thread_state,
+    get_session,
+    get_vector_store,
+)
 from chatbot.db.models import UserModel
 from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.graphs.v2.agent import GRAPH
 from chatbot.llm.config import CATEGORIZED_MODELS, get_model
 from chatbot.llm.pricing import compute_cost
 from chatbot.schemas import Attachment, UserResponse
@@ -34,18 +42,16 @@ chat_router = APIRouter(tags=["Chat"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent.parent / "templates"))
 
 
-@chat_router.get(path="/")
-async def new_chat(
-    current_user: Annotated[UserModel, Depends(get_current_user)],
-):
+@chat_router.get(path="/", dependencies=[Depends(get_current_user)])
+async def new_chat():
     """Create a new chat"""
 
-    thread_id = str(uuid.uuid4())
+    thread_id = uuid.uuid4()
 
     return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
 
 
-@chat_router.delete(path="/chat")
+@chat_router.delete(path="/chat", dependencies=[Depends(get_owned_thread_state)])
 async def delete_chats(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -99,35 +105,26 @@ async def delete_chats(
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def get_chat(
     request: Request,
-    thread_id: str,
+    thread_id: uuid.UUID,
+    state: Annotated[StateSnapshot, Depends(get_owned_thread_state)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Retrieve the chat history for the given ID thread and the current user"""
 
-    # Retrieve messages from graph state of the current thread.
-    state = await GRAPH.aget_state({"configurable": {"thread_id": thread_id}})
-    messages = state.values.get("messages", []) if state and hasattr(state, "values") else []
+    values = (state.values if state else None) or {}
 
-    # Retrieve costs.
-    in_tokens = state.values.get("total_input_tokens", 0) if state and hasattr(state, "values") else 0
-    out_tokens = state.values.get("total_output_tokens", 0) if state and hasattr(state, "values") else 0
+    # Retrieve chat data.
+    messages = values.get("messages", [])
+    in_tokens = values.get("total_input_tokens", 0)
+    out_tokens = values.get("total_output_tokens", 0)
+
     cost_amount = compute_cost(S.MODEL_NAME, in_tokens, out_tokens)  # TODO: adjust
 
-    # Security check if the thread belongs to another user.
-    if state and state.metadata:
-        thread_owner = state.metadata.get("user_id")
-        if thread_owner and thread_owner != str(current_user.id):
-            # TODO: adjust UI
-            raise HTTPException(
-                status_code=403,
-                detail="You don't have the permission for accessing this chat.",
-            )
-
     # Parse messages for UI rendering purposes.
-    parsed_messages = await parse_messages(thread_id, messages)
+    parsed_messages = await parse_messages(str(thread_id), messages)
 
-    # Retrieve the list of all the threads specific for the user in order to visualize them into the chronology.
+    # Retrieve the list of all the threads of the current user in order to visualize them into the sidebar chronology.
     query = text("SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id;")
     result = await session.execute(query, {"user_id": str(current_user.id)})
 
@@ -136,7 +133,7 @@ async def get_chat(
         name="index.html",
         context={
             "messages": parsed_messages,
-            "thread_id": thread_id,
+            "thread_id": str(thread_id),
             "threads": [str(row[0]) for row in result.all()],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
@@ -145,10 +142,10 @@ async def get_chat(
     )
 
 
-@chat_router.post(path="/chat/{thread_id}", response_class=HTMLResponse)
+@chat_router.post(path="/chat/{thread_id}", dependencies=[Depends(get_owned_thread_state)], response_class=HTMLResponse)
 async def add_user_message(
     request: Request,
-    thread_id: str,
+    thread_id: uuid.UUID,
     current_user: Annotated[UserModel, Depends(get_current_user)],
     message: str = Form(...),
     file: UploadFile | None = File(None),
@@ -160,31 +157,38 @@ async def add_user_message(
     if not message:
         return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
 
-    # Handle the optional attachment file.
+    # Handle the allowed optional attachment file.
     attachment = None
-    if file and file.filename and file.content_type:
-        mime_type = file.content_type
-        content_bytes = await file.read()
-        size_kb = round(len(content_bytes) / 1024, 2)
-
+    if file and file.filename and file.content_type and file.size:
+        size_kb = round(file.size / 1024, 2)
+        if file.content_type not in ALLOWED_MIME_TYPES:
+            return templates.TemplateResponse(
+                request=request,
+                name="partials/error_message.html",
+                context={"error": "File type not allowed."},
+            )
         if size_kb > S.MAX_ATTACHMENTS_SIZE:
             return templates.TemplateResponse(
                 request=request,
                 name="partials/error_message.html",
-                context={"error": "The maximum allowed file size is 1MB."},
+                context={"error": f"The maximum allowed file size is {S.MAX_ATTACHMENTS_SIZE}KB."},
             )
 
+        # Download file.
+        content_bytes = await file.read()
+
         # Upload su Google Cloud Storage in order to keep them tracked.
-        filename = f"{uuid.uuid4()}_{file.filename}"
+        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
+        filename = f"{uuid.uuid4()}_{safe_name}"
         bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
         blob = bucket.blob(f"attachments/{filename}")
-        await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=mime_type)
+        await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=file.content_type)
 
         # Create attachment object.
         attachment = Attachment(
             id=filename,
             file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{filename}",
-            type=mime_type,
+            type=file.content_type,
             size=f"{size_kb}KB",
         )
 
@@ -201,15 +205,18 @@ async def add_user_message(
         name="partials/message_pair.html",
         context={
             "user_message": user_message,
-            "thread_id": thread_id,
+            "thread_id": str(thread_id),
         },
     )
 
 
-@chat_router.post(path="/chat/{thread_id}/assistant", response_class=HTMLResponse)
+@chat_router.post(
+    path="/chat/{thread_id}/assistant", dependencies=[Depends(get_owned_thread_state)], response_class=HTMLResponse
+)
 async def add_assistant_message(
     request: Request,
-    thread_id: str,
+    thread_id: uuid.UUID,
+    graph: Annotated[CompiledStateGraph, Depends(get_graph)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     vector_store: PGVectorStore = Depends(get_vector_store),
     user_message_json: str | None = Form(None),
@@ -265,7 +272,7 @@ async def add_assistant_message(
 
     # Define the graph configuration.
     config = RunnableConfig(
-        configurable={"thread_id": thread_id},
+        configurable={"thread_id": str(thread_id)},
         metadata={
             "user_id": str(current_user.id),
             "username": current_user.username,
@@ -273,7 +280,7 @@ async def add_assistant_message(
         recursion_limit=S.RECURSION_LIMIT,
     )
     context = Context(
-        thread_id=thread_id,
+        thread_id=str(thread_id),
         chatbot_name=S.CHATBOT_NAME,
         model=get_model(model_name or S.MODEL_NAME),
         system_prompt=SYSTEM_PROMPT.format(
@@ -286,7 +293,7 @@ async def add_assistant_message(
 
     # Graph execution.
     try:
-        response = await GRAPH.ainvoke(
+        response = await graph.ainvoke(
             graph_input,
             stream_mode="values",
             config=config,
@@ -305,14 +312,14 @@ async def add_assistant_message(
         )
 
     # Check for interrupt.
-    state_snapshot = await GRAPH.aget_state(config)
+    state_snapshot = await graph.aget_state(config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
         return templates.TemplateResponse(
             request=request,
             name="partials/approval_request.html",
             context={
-                "thread_id": thread_id,
+                "thread_id": str(thread_id),
                 "approval_info": pending_interrupt,
             },
         )
@@ -328,7 +335,7 @@ async def add_assistant_message(
     messages = messages[start_idx:]
 
     # Create assistant response.
-    assistant_message = await extract_assistant_response(thread_id, messages)
+    assistant_message = await extract_assistant_response(str(thread_id), messages)
 
     return templates.TemplateResponse(
         request=request,

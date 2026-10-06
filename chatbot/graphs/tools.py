@@ -4,7 +4,6 @@ import json
 import re
 import uuid
 from io import BytesIO
-from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -89,8 +88,8 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
 
 @tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content_and_artifact")
 async def execute_sql(
-    query: str, db_name: str, ref_table_name: str, runtime: ToolRuntime[Context]
-) -> tuple[dict | str, Any]:
+    query: str, db_name: DBName, ref_table_name: str, runtime: ToolRuntime[Context]
+) -> tuple[dict | str, dict | None]:
     """
     Executes a SQL query on PostgreSQL and returns the result as a parsed table.
 
@@ -159,7 +158,7 @@ async def execute_sql(
 @tool("create_plot", args_schema=CodePlotInput, response_format="content_and_artifact")
 async def create_plot(
     code: str, description: str, ref_table_name: str, runtime: ToolRuntime[Context]
-) -> tuple[list | str, dict | None]:
+) -> tuple[str, dict | None]:
     """
     Executes Python code to create a custom seaborn plot and provide an argumentative related description.
 
@@ -220,9 +219,9 @@ async def create_plot(
         buf = BytesIO()
         plt.savefig(buf, format="png", bbox_inches="tight")
         buf.seek(0)
-        image_bytes = buf.read()
+        _image_bytes = buf.read()
         buf.close()
-        return image_bytes
+        return _image_bytes
 
     try:
         image_bytes = await asyncio.wait_for(asyncio.to_thread(_render_plot), timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
@@ -255,7 +254,7 @@ async def create_plot(
 @tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
 async def download_and_analyze_pdf_from_gcs(
     gcs_uri: str, runtime: ToolRuntime[Context]
-) -> tuple[list | str, dict | None]:
+) -> tuple[list[dict] | str, dict | None]:
     """
     Download and analyze a single PDF file from Google Cloud Storage.
 
@@ -307,7 +306,7 @@ async def download_and_analyze_pdf_from_gcs(
 
 
 @tool("retrieve_information", args_schema=RAGInput, response_format="content")
-async def retrieve_information(query: str, source: Source, runtime: ToolRuntime) -> str:
+async def retrieve_information(query: str, source: Source, runtime: ToolRuntime[Context]) -> str:
     """
     Retrieve relevant information from a knowledge source using a RAG (Retrieval-Augmented Generation) approach.
 
