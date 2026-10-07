@@ -56,31 +56,31 @@ async def new_chat():
     return RedirectResponse(url=f"/chat/{thread_id}", status_code=303, headers={"Cache-Control": "no-store"})
 
 
-@chat_router.delete(path="/chat")
+@chat_router.delete(path="/chat", response_class=HTMLResponse)
 async def delete_chats(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     checkpointer: Annotated[AsyncPostgresSaver, Depends(get_checkpointer)],
     store: Annotated[AsyncPostgresStore, Depends(get_store)],
 ):
-    """Delete all the chat threads belonging to the current user"""
+    """Delete all the chat threads information belonging to the current user"""
 
     # Retrieve the list of all the threads of the current user.
     query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
     threads = (await session.execute(query)).scalars().all()
 
-    # TODO: maybe it could be optimized for a production scenario with many users.
+    # TODO: maybe it could be optimized for a production scenario with many threads per user.
     if threads:
+        # Delete threads from main dataset.
+        await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
+
         # Delete all the thread information from graph checkpointer.
         for thread in threads:
             await checkpointer.adelete_thread(str(thread))
             # Delete all the thread information from graph store artifacts.
-            items = await store.asearch(("artifacts", str(thread)))
+            items = await store.asearch(("artifacts", str(thread)), limit=1000)
             for item in items:
                 await store.adelete(item.namespace, item.key)
-
-        # Delete threads from main dataset.
-        await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
 
     return HTMLResponse(headers={"HX-Redirect": "/"})
 
