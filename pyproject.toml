@@ -8,13 +8,18 @@ packages = [{ include = "chatbot" }]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0.0"
+# Web App & API
 uvicorn = "0.52.4"
 fastapi = "0.141.1"
+jinja2 = "3.1.6"
 python-multipart = "0.0.32"
+# Data Processing & Config
 pydantic = { version = "2.13.5", extras = ["email"] }
 pydantic-settings = "2.15.0"
-passlib = { version = "1.7.4", extras = ["argon2"] }
+# Security & Authentication
+pwdlib = { version = "0.3.1", extras = ["argon2"] }
 pyjwt = "2.15.1"
+# LLM, Agents & Orchestration
 langchain-core = "1.6.5"
 langchain-text-splitters = "1.1.2"
 langchain-ollama = "1.1.0"
@@ -24,11 +29,13 @@ langchain = "1.4.2"
 langgraph = "1.2.12"
 langgraph-checkpoint = "4.2.0"
 langgraph-checkpoint-postgres = "3.1.2"
+tiktoken = "0.14.0"
+# Database & ORM
 psycopg2-binary = "2.9.13"
-more-itertools = "11.1.0"
+# Cloud & External Services
 google-genai = "2.25.0"
 google-cloud-storage = "3.15.0"
-tiktoken = "0.14.0"
+# Visualization
 matplotlib = "3.11.2"
 seaborn = "0.13.2"
 
