@@ -38,9 +38,8 @@
         }
 
         body.is-generating #submit-btn {
-            opacity: 0.35 !important;
+            opacity: 0 !important;
             pointer-events: none !important;
-            cursor: not-allowed !important;
         }
 
         .sidebar-collapsed aside {
@@ -350,7 +349,12 @@
                         class="flex-1 bg-transparent text-sm focus:outline-none resize-none max-h-36 py-1 overflow-y-auto"
                     ></textarea>
 
-                    <button type="submit" id="submit-btn" aria-label="Send message" class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400 shadow-sm active:scale-95">
+                    <button
+                        type="submit"
+                        id="submit-btn"
+                        aria-label="Send message"
+                        class="shrink-0 w-9 h-9 rounded-full bg-pine-600 hover:bg-pine-700 text-white flex items-center justify-center transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-600 dark:focus-visible:ring-pine-400 shadow-sm active:scale-95 opacity-0 pointer-events-none scale-75"
+                    >
                         <i data-lucide="arrow-up" class="w-4 h-4" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -361,15 +365,6 @@
     <script>
         lucide.createIcons();
 
-        document.body.addEventListener('htmx:afterSwap', () => {
-            lucide.createIcons();
-            document.body.classList.remove('is-generating');
-            submitBtn.disabled = false;
-            textarea.disabled = false;
-            textarea.focus();
-            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
-        });
-
         const textarea = document.getElementById('chat-textarea');
         const form = document.getElementById('chat-form');
         const submitBtn = document.getElementById('submit-btn');
@@ -378,7 +373,46 @@
         const modelSelect = document.getElementById('model-select');
         const activeModelName = document.getElementById('active-model-name');
         const userNameEl = document.getElementById('current-user-name');
+        const fileInput = document.getElementById('file-input');
         const currentUserName = userNameEl ? userNameEl.textContent.trim() : 'User';
+
+        function updateButtonVisibility() {
+            if (document.body.classList.contains('is-generating')) {
+                submitBtn.classList.add('opacity-0', 'pointer-events-none', 'scale-75');
+                submitBtn.classList.remove('opacity-100', 'pointer-events-auto', 'scale-100');
+                return;
+            }
+
+            const hasText = textarea.value.trim().length > 0;
+            const hasFile = fileInput.files && fileInput.files.length > 0;
+
+            if (hasText || hasFile) {
+                submitBtn.classList.remove('opacity-0', 'pointer-events-none', 'scale-75');
+                submitBtn.classList.add('opacity-100', 'pointer-events-auto', 'scale-100');
+            } else {
+                submitBtn.classList.add('opacity-0', 'pointer-events-none', 'scale-75');
+                submitBtn.classList.remove('opacity-100', 'pointer-events-auto', 'scale-100');
+            }
+        }
+
+        document.body.addEventListener('htmx:afterRequest', (event) => {
+            if (event.detail.elt === form) {
+                document.body.classList.remove('is-generating');
+                updateButtonVisibility();
+                textarea.disabled = false;
+                textarea.focus();
+
+                const indicator = document.getElementById('chat-indicator');
+                if (indicator && event.detail.xhr.status === 204) {
+                    indicator.remove();
+                }
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', () => {
+            lucide.createIcons();
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+        });
 
         function syncModelBadge(name) {
             if (activeModelName) activeModelName.textContent = name;
@@ -418,7 +452,10 @@
             el.style.height = el.scrollHeight + 'px';
         }
 
-        textarea.addEventListener('input', () => autoResize(textarea));
+        textarea.addEventListener('input', () => {
+            autoResize(textarea);
+            updateButtonVisibility();
+        });
 
         textarea.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
@@ -429,14 +466,14 @@
 
                 event.preventDefault();
 
-                if (document.body.classList.contains('is-generating') || submitBtn.disabled) {
+                if (document.body.classList.contains('is-generating')) {
                     return;
                 }
 
-                const fileInput = document.getElementById('file-input');
-                const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+                const hasText = textarea.value.trim().length > 0;
+                const hasFile = fileInput.files && fileInput.files.length > 0;
 
-                if (textarea.value.trim() !== '' || hasFile) {
+                if (hasText || hasFile) {
                     submitBtn.click();
                 }
             }
@@ -448,13 +485,17 @@
             );
         }
 
-        form.addEventListener('submit', () => {
+        form.addEventListener('submit', (event) => {
             const text = textarea.value.trim();
-            const fileInput = document.getElementById('file-input');
-            const file = fileInput.files[0];
+            const file = fileInput.files ? fileInput.files[0] : null;
+
+            if (!text && !file) {
+                event.preventDefault();
+                return;
+            }
 
             document.body.classList.add('is-generating');
-            submitBtn.disabled = true;
+            updateButtonVisibility();
 
             const emptyState = chatContainer.querySelector('.empty-state');
             if (emptyState) emptyState.remove();
@@ -506,7 +547,8 @@
                 form.reset();
                 clearFileInput();
                 textarea.style.height = 'auto';
-            }, 20);
+                updateButtonVisibility();
+            }, 100);
         });
 
         function updateFilePreview(input) {
@@ -519,16 +561,17 @@
             } else {
                 clearFileInput();
             }
+            updateButtonVisibility();
         }
 
         function clearFileInput() {
-            const input = document.getElementById('file-input');
             const preview = document.getElementById('file-preview');
-            if (input) input.value = '';
+            if (fileInput) fileInput.value = '';
             if (preview) {
                 preview.classList.add('hidden');
                 preview.classList.remove('flex');
             }
+            updateButtonVisibility();
         }
 
         async function copyMessage(button) {

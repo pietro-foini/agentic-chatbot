@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.db.models import ThreadModel, UserModel
+from chatbot.errors import AuthenticationRequiredError
 from chatbot.settings import S
 
 
@@ -67,31 +68,23 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_current_user(
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    access_token_cookie: Annotated[str | None, Cookie(alias="access_token")] = None,
+    token_cookie: Annotated[str | None, Cookie(alias="access_token")] = None,
 ) -> UserModel:
     """Authenticate API requests based on token returning the active user or redirect to login page"""
 
-    token = access_token_cookie
+    token = token_cookie
+
+    if not token:
+        raise AuthenticationRequiredError()
 
     try:
         payload = jwt.decode(token, S.SECRET_KEY, algorithms=[S.ALGORITHM])
         user_id = payload.get("sub")
         if user_id is None:
-            if request.headers.get("HX-Request"):
-                raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
-            raise HTTPException(
-                status_code=303,
-                headers={"Location": "/login"},
-            )
+            raise AuthenticationRequiredError()
     except InvalidTokenError:
-        if request.headers.get("HX-Request"):
-            raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
-        raise HTTPException(
-            status_code=303,
-            headers={"Location": "/login"},
-        )
+        raise AuthenticationRequiredError()
 
     # Retrieve the current user if it is not disabled.
     query = select(UserModel).where(UserModel.id == user_id, UserModel.is_active.is_(True))
@@ -99,11 +92,6 @@ async def get_current_user(
 
     current_user = result.scalar_one_or_none()
     if not current_user:
-        if request.headers.get("HX-Request"):
-            raise HTTPException(status_code=401, headers={"HX-Redirect": "/login"})
-        raise HTTPException(
-            status_code=303,
-            headers={"Location": "/login"},
-        )
+        raise AuthenticationRequiredError()
 
     return current_user

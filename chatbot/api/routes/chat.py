@@ -140,32 +140,26 @@ async def process_chat(
 ):
     """Post a user message to assistant conversation to the chat history for the given ID thread"""
 
-    try:
-        if approved is not None:  # Human into the loop
-            # Prepare input for graph execution.
-            graph_input = build_resume_command(approved, reason)
-        elif message and message.strip():  # New message
-            # Prepare attachment.
-            attachment = await save_attachment(file)
-            # Prepare human message.
-            human_message = build_human_message(current_user, message.strip(), attachment)
-            # Prepare input for graph execution.
-            graph_input = {"messages": [human_message], "user_preferences": DEFAULT_USER_PREFERENCES}
-            # Create the thread record into the reference table if not already exist (idempotency).
-            stmt = (
-                insert(ThreadModel)
-                .values(thread_id=thread_id, user_id=str(current_user.id))
-                .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
-            )
-            await session.execute(stmt)
-        else:
-            raise UserFacingError("Please write a message.")
-    except UserFacingError as e:
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/error_message.html",
-            context={"error": str(e)},
+    if approved is not None:  # Human into the loop
+        # Prepare input for graph execution.
+        graph_input = build_resume_command(approved, reason)
+    elif (message and message.strip()) or file:  # New message
+        # Prepare attachment.
+        attachment = await save_attachment(file)
+        # Prepare human message.
+        message = message.strip() if message else "Analyze the attachment."
+        human_message = build_human_message(current_user, message, attachment)
+        # Prepare input for graph execution.
+        graph_input = {"messages": [human_message], "user_preferences": DEFAULT_USER_PREFERENCES}
+        # Create the thread record into the reference table if not already exist (idempotency).
+        stmt = (
+            insert(ThreadModel)
+            .values(thread_id=thread_id, user_id=str(current_user.id))
+            .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
         )
+        await session.execute(stmt)
+    else:
+        return Response(status_code=204)
 
     # Define the graph setting.
     config = RunnableConfig(
@@ -186,18 +180,10 @@ async def process_chat(
         response = await graph.ainvoke(graph_input, stream_mode="values", config=config, context=context)
     except ServerError:
         logger.exception("LLM provider unavailable (thread=%s)", thread_id)
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/error_message.html",
-            context={"error": "The AI service is temporarily unavailable. Please try again in a moment."},
-        )
+        raise UserFacingError("The AI service is temporarily unavailable. Please try again in a moment.")
     except (GraphRecursionError, ChatGoogleGenerativeAIError):
         logger.exception("Graph execution failed (thread=%s)", thread_id)
-        return templates.TemplateResponse(
-            request=request,
-            name="partials/error_message.html",
-            context={"error": "A system error occurred while processing your request. Please try again."},
-        )
+        raise UserFacingError("A system error occurred while processing your request. Please try again.")
 
     # Check for a new interrupt.
     state_snapshot = await graph.aget_state(config)
