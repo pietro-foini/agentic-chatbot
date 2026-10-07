@@ -104,7 +104,7 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
                             elif item_type in ("media", "image", "file"):
                                 attachment_data = Attachment(
                                     id=file_metadata["id"],
-                                    file_uri=item["file_uri"],
+                                    file_uri=item["file_id"],
                                     type=item["mime_type"],
                                     size=file_metadata["size"],
                                 )
