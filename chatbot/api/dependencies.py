@@ -9,12 +9,11 @@ from langchain_postgres import PGVectorStore
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
-from langgraph.types import StateSnapshot
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.db.config import db
-from chatbot.db.models import UserModel
+from chatbot.db.models import ThreadModel, UserModel
 from chatbot.settings import S
 
 ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg"}
@@ -26,26 +25,18 @@ def get_graph(request: Request) -> CompiledStateGraph:
     return request.app.state.graph
 
 
-async def get_owned_thread_state(
+async def get_owned_thread(
     thread_id: uuid.UUID,
     current_user: Annotated[UserModel, Depends(get_current_user)],
-    graph: Annotated[CompiledStateGraph, Depends(get_graph)],
-) -> StateSnapshot | None:
-    """Get the thread state only if the thread is new or belongs to the current user"""
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> uuid.UUID:
+    """Ensure the thread is either new or belongs to the current user"""
 
-    state = await graph.aget_state({"configurable": {"thread_id": str(thread_id)}})
+    owner = await session.scalar(select(ThreadModel.user_id).where(ThreadModel.thread_id == thread_id))
+    if owner is not None and owner != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Chat not found.")
 
-    if not state or not state.values:
-        return None
-
-    thread_owner = (state.metadata or {}).get("user_id")
-    if thread_owner and thread_owner != str(current_user.id):
-        raise HTTPException(
-            status_code=404,
-            detail="Chat not found.",
-        )
-
-    return state
+    return thread_id
 
 
 def get_vector_store(request: Request) -> PGVectorStore:

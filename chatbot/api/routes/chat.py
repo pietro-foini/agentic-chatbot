@@ -26,7 +26,7 @@ from chatbot.api.dependencies import (
     get_checkpointer,
     get_current_user,
     get_graph,
-    get_owned_thread_state,
+    get_owned_thread,
     get_session,
     get_store,
     get_vector_store,
@@ -69,7 +69,7 @@ async def delete_chats(
     query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
     threads = (await session.execute(query)).scalars().all()
 
-    # TODO: maybe it could be optimized for a production scenario with many threads per user.
+    # TODO: maybe it could be optimized for a production scenario with many threads per user or add limit to chat threads.
     if threads:
         # Delete threads from main dataset.
         await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
@@ -88,13 +88,15 @@ async def delete_chats(
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def get_chat(
     request: Request,
-    thread_id: uuid.UUID,
-    state: Annotated[StateSnapshot, Depends(get_owned_thread_state)],
+    thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    graph: Annotated[CompiledStateGraph, Depends(get_graph)],
 ):
     """Retrieve the chat history for the given ID thread and the current user"""
 
+    # Retrieve the graph state of the current thread.
+    state = await graph.aget_state({"configurable": {"thread_id": str(thread_id)}})
     values = (state.values if state else None) or {}
 
     # Retrieve chat data.
@@ -125,13 +127,13 @@ async def get_chat(
     )
 
 
-@chat_router.post(path="/chat/{thread_id}", dependencies=[Depends(get_owned_thread_state)], response_class=HTMLResponse)
+@chat_router.post(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def add_user_message(
     request: Request,
-    thread_id: uuid.UUID,
+    thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-    message: str = Form(..., max_length=4000),
+    message: str = Form(..., max_length=500),
     file: UploadFile | None = File(None),
 ):
     """Post a user message to the chat history for the given ID thread"""
@@ -205,12 +207,10 @@ async def add_user_message(
     )
 
 
-@chat_router.post(
-    path="/chat/{thread_id}/assistant", dependencies=[Depends(get_owned_thread_state)], response_class=HTMLResponse
-)
+@chat_router.post(path="/chat/{thread_id}/assistant", response_class=HTMLResponse)
 async def add_assistant_message(
     request: Request,
-    thread_id: uuid.UUID,
+    thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     vector_store: PGVectorStore = Depends(get_vector_store),
