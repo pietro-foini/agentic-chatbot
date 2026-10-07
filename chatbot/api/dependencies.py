@@ -12,7 +12,6 @@ from langgraph.store.postgres import AsyncPostgresStore
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chatbot.db.config import db
 from chatbot.db.models import ThreadModel, UserModel
 from chatbot.settings import S
 
@@ -59,8 +58,12 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session per request lifecycle"""
 
     async with request.app.state.db.session_factory() as session:
-        yield session
-        await session.commit()
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def get_current_user(

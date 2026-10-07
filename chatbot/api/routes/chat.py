@@ -69,8 +69,7 @@ async def delete_chats(
     query = select(ThreadModel.thread_id).where(ThreadModel.user_id == current_user.id)
     threads = (await session.execute(query)).scalars().all()
 
-    # TODO: maybe it could be optimized for a production scenario with many threads per user or add
-    #  limit to chat threads.
+    # TODO: optimize for a production scenario with many threads per user or add limit to chat threads.
     if threads:
         # Delete threads from main dataset.
         await session.execute(delete(ThreadModel).where(ThreadModel.user_id == current_user.id))
@@ -175,7 +174,7 @@ async def process_chat(
     )
     context = Context(
         thread_id=str(thread_id),
-        model=MODELS.get(model_name, S.MODEL_NAME),
+        model=MODELS.get(model_name) or MODELS[S.MODEL_NAME],
         system_prompt=SYSTEM_PROMPT.format(user_name=current_user.username, bot_name=S.CHATBOT_NAME),
         tools=ALL_TOOLS,
         vector_store=vector_store,
@@ -199,7 +198,7 @@ async def process_chat(
 
     # Check for a new interrupt.
     state_snapshot = await graph.aget_state(config)
-    if state_snapshot.next:
+    if state_snapshot.next and state_snapshot.tasks and state_snapshot.tasks[0].interrupts:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
         return templates.TemplateResponse(
             request=request,
