@@ -6,7 +6,9 @@ import jwt
 from fastapi import Cookie, Depends, HTTPException, Request
 from jwt.exceptions import InvalidTokenError
 from langchain_postgres import PGVectorStore
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.postgres import AsyncPostgresStore
 from langgraph.types import StateSnapshot
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +52,18 @@ def get_vector_store(request: Request) -> PGVectorStore:
     """Get PGVectorStore instance from request object initialized during startup"""
 
     return request.app.state.vector_store
+
+
+def get_checkpointer(request: Request) -> AsyncPostgresSaver:
+    """Get checkpointer instance from request object initialized during startup"""
+
+    return request.app.state.checkpointer
+
+
+def get_store(request: Request) -> AsyncPostgresStore:
+    """Get store instance from request object initialized during startup"""
+
+    return request.app.state.store
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

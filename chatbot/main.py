@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from langchain_postgres import PGVectorStore
 
 from chatbot.api.routes import auth_router, chat_router
-from chatbot.db.config import connection_pool, db, pg_engine
+from chatbot.db.config import checkpointer, connection_pool, db, pg_engine, store
 from chatbot.embeddings.config import embeddings
-from chatbot.graphs.v2.agent import GRAPH
+from chatbot.graphs.v2.agent import LangGraphAgent
 from chatbot.settings import S
 
 
@@ -25,7 +25,9 @@ async def lifespan(app: FastAPI):
             embedding_service=embeddings,
             metadata_columns=["source"],
         )
-        app.state.graph = GRAPH
+        app.state.graph = LangGraphAgent
+        app.state.checkpointer = checkpointer
+        app.state.store = store
         yield
     finally:  # Close connections at the application shutdown or crash.
         await connection_pool.close()

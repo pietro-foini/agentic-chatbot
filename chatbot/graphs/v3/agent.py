@@ -81,7 +81,7 @@ async def dynamic_model(
 
 
 # noinspection PyTypeChecker
-GRAPH = create_agent(
+LangGraphAgent = create_agent(
     model=get_model(S.MODEL_NAME),
     tools=SUPERVISOR_TOOLS,
     state_schema=State,

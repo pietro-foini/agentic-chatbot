@@ -34,4 +34,4 @@ def create_agent_graph(max_attempts: int, checkpointer: BaseCheckpointSaver):
 
 
 # Create the graph instance.
-GRAPH = create_agent_graph(max_attempts=S.MAX_ATTEMPTS, checkpointer=checkpointer)
+LangGraphAgent = create_agent_graph(max_attempts=S.MAX_ATTEMPTS, checkpointer=checkpointer)

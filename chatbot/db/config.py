@@ -1,6 +1,7 @@
 from langchain_postgres import PGEngine
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
+from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from chatbot.db.postgres import PostgresAsyncHandler
@@ -12,7 +13,7 @@ connection_pool = AsyncConnectionPool(
     open=False,
     kwargs={
         "autocommit": True,
-        "prepare_threshold": 0,
+        "row_factory": dict_row,
     },
 )
 # Define the checkpointer for only keeping the graph messages and the light state.

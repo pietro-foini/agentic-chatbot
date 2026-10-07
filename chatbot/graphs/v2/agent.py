@@ -107,7 +107,7 @@ async def track_tool_metrics(
 
 # Create the graph instance.
 # noinspection PyTypeChecker
-GRAPH = create_agent(
+LangGraphAgent = create_agent(
     model=get_model(S.MODEL_NAME),
     tools=ALL_TOOLS,
     state_schema=State,

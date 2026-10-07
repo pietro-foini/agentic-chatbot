@@ -12,19 +12,23 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_postgres import PGVectorStore
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.postgres import AsyncPostgresStore
 from langgraph.types import Command, StateSnapshot
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.api.dependencies import (
     ALLOWED_MIME_TYPES,
+    get_checkpointer,
     get_current_user,
     get_graph,
     get_owned_thread_state,
     get_session,
+    get_store,
     get_vector_store,
 )
 from chatbot.db.models import ThreadModel, UserModel
@@ -56,52 +60,29 @@ async def new_chat():
 async def delete_chats(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    checkpointer: Annotated[AsyncPostgresSaver, Depends(get_checkpointer)],
+    store: Annotated[AsyncPostgresStore, Depends(get_store)],
 ):
     """Delete all the chat threads belonging to the current user"""
 
-    await session.execute(
-        text("""
-            DELETE FROM store 
-            WHERE prefix IN (
-                SELECT 'artifacts.' || thread_id 
-                FROM checkpoints 
-                WHERE metadata ->> 'user_id' = :user_id
-            );
-        """),
-        {"user_id": str(current_user.id)},
-    )
+    # Retrieve the list of all the threads of the current user.
+    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
+    threads = (await session.execute(query)).scalars().all()
 
-    await session.execute(
-        text("""
-            DELETE FROM checkpoint_writes 
-            WHERE thread_id IN (
-                SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id
-            );
-        """),
-        {"user_id": str(current_user.id)},
-    )
-    await session.execute(
-        text("""
-            DELETE FROM checkpoint_blobs 
-            WHERE thread_id IN (
-                SELECT DISTINCT thread_id FROM checkpoints WHERE metadata ->> 'user_id' = :user_id
-            );
-        """),
-        {"user_id": str(current_user.id)},
-    )
-    await session.execute(
-        text("""
-            DELETE FROM checkpoints 
-            WHERE metadata ->> 'user_id' = :user_id;
-        """),
-        {"user_id": str(current_user.id)},
-    )
-    await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
+    # TODO: maybe it could be optimized for a production scenario with many users.
+    if threads:
+        # Delete all the thread information from graph checkpointer.
+        for thread in threads:
+            await checkpointer.adelete_thread(str(thread))
+            # Delete all the thread information from graph store artifacts.
+            items = await store.asearch(("artifacts", str(thread)))
+            for item in items:
+                await store.adelete(item.namespace, item.key)
 
-    response = HTMLResponse()
-    response.headers["HX-Redirect"] = "/"
+        # Delete threads from main dataset.
+        await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
 
-    return response
+    return HTMLResponse(headers={"HX-Redirect": "/"})
 
 
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
@@ -127,11 +108,7 @@ async def get_chat(
     parsed_messages = await parse_messages(str(thread_id), messages)
 
     # Retrieve the list of all the threads of the current user.
-    query = (
-        select(ThreadModel.thread_id)
-        .where(ThreadModel.user_id == str(current_user.id))
-        .order_by(ThreadModel.created_at.desc())
-    )
+    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
     threads = (await session.execute(query)).scalars().all()
 
     return templates.TemplateResponse(
@@ -140,7 +117,7 @@ async def get_chat(
         context={
             "messages": parsed_messages,
             "thread_id": str(thread_id),
-            "threads": [str(t_id) for t_id in threads],
+            "threads": [str(thread) for thread in threads],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
             "chat_cost": f"${cost_amount:.5f}",
