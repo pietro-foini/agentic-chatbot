@@ -161,6 +161,8 @@ async def process_chat(
     else:
         return Response(status_code=204)
 
+    await session.commit()
+
     # Define the graph setting.
     config = RunnableConfig(
         configurable={"thread_id": str(thread_id)},
