@@ -21,7 +21,9 @@ from langgraph.types import Command
 from chatbot.db.config import checkpointer, store
 from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
+from chatbot.graphs.utils import extract_model_name
 from chatbot.llm.config import get_model
+from chatbot.llm.pricing import compute_cost
 from chatbot.settings import S
 
 
@@ -53,23 +55,34 @@ async def track_model_metrics(
 
     elapsed = round(end_time - start_time, 2)
 
-    total_input_tokens, total_output_tokens = 0, 0
-
+    total_cost = 0.0
     for msg in response.result:
+        in_tokens, out_tokens = 0, 0
+
+        # Get used tokens.
+        if hasattr(msg, "usage_metadata") and msg.usage_metadata:
+            in_tokens = msg.usage_metadata.get("input_tokens", 0)
+            out_tokens = msg.usage_metadata.get("output_tokens", 0)
+
+        # Compute cost.
+        model_name = extract_model_name(request, msg)
+        msg_cost = round(compute_cost(model_name, in_tokens, out_tokens), 6)
+
+        # Save retrieved information into the message.
         msg.response_metadata = {
             **(getattr(msg, "response_metadata", {}) or {}),
             "elapsed_time": elapsed,
+            "cost": msg_cost,
         }
-        if hasattr(msg, "usage_metadata") and msg.usage_metadata:
-            total_input_tokens += msg.usage_metadata.get("input_tokens", 0)
-            total_output_tokens += msg.usage_metadata.get("output_tokens", 0)
+
+        # Accumulate costs for state.
+        total_cost += msg_cost
 
     return ExtendedModelResponse(
         model_response=response,
         command=Command(
             update={
-                "total_input_tokens": total_input_tokens,
-                "total_output_tokens": total_output_tokens,
+                "total_cost": total_cost,
             }
         ),
     )

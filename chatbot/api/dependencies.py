@@ -33,7 +33,7 @@ async def get_owned_thread(
     """Ensure the thread is either new or belongs to the current user"""
 
     owner = await session.scalar(select(ThreadModel.user_id).where(ThreadModel.thread_id == thread_id))
-    if owner is not None and owner != str(current_user.id):
+    if owner is not None and owner != current_user.id:
         raise HTTPException(status_code=404, detail="Chat not found.")
 
     return thread_id

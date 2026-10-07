@@ -14,8 +14,7 @@ class State(TypedDict):
 
     messages: Required[Annotated[list[AnyMessage], add_messages]]
 
-    total_input_tokens: Annotated[int, operator.add]
-    total_output_tokens: Annotated[int, operator.add]
+    total_cost: Annotated[float, operator.add]
 
 
 @dataclass

@@ -16,7 +16,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
-from langgraph.types import Command, StateSnapshot
+from langgraph.types import Command
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,6 @@ from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.llm.config import CATEGORIZED_MODELS, get_model
-from chatbot.llm.pricing import compute_cost
 from chatbot.schemas import Attachment, UserResponse
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
@@ -101,10 +100,7 @@ async def get_chat(
 
     # Retrieve chat data.
     messages = values.get("messages", [])
-    in_tokens = values.get("total_input_tokens", 0)
-    out_tokens = values.get("total_output_tokens", 0)
-
-    cost_amount = compute_cost(S.MODEL_NAME, in_tokens, out_tokens)  # TODO: adjust
+    total_cost = values.get("total_cost", 0)
 
     # Parse messages for UI rendering purposes.
     parsed_messages = await parse_messages(str(thread_id), messages)
@@ -122,7 +118,7 @@ async def get_chat(
             "threads": [str(thread) for thread in threads],
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
-            "chat_cost": f"${cost_amount:.5f}",
+            "chat_cost": f"${total_cost:.5f}",
         },
     )
 
@@ -319,10 +315,8 @@ async def add_assistant_message(
             },
         )
 
-    in_tokens = state_snapshot.values.get("total_input_tokens", 0)
-    out_tokens = state_snapshot.values.get("total_output_tokens", 0)
-
-    cost_amount = compute_cost(model_name or S.MODEL_NAME, in_tokens, out_tokens)
+    # Get total cost.
+    total_cost = state_snapshot.values.get("total_cost", 0)
 
     # Get messages.
     messages = response["messages"]
@@ -337,6 +331,6 @@ async def add_assistant_message(
         name="partials/assistant_message.html",
         context={
             "response": assistant_message,
-            "total_cost": f"${cost_amount:.5f}",
+            "total_cost": f"${total_cost:.5f}",
         },
     )
