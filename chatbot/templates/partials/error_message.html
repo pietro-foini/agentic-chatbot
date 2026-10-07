@@ -1,14 +1,4 @@
-<article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-2.5 htmx-added">
-    <div class="group/avatar relative shrink-0">
-        <div class="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center text-red-600 dark:text-red-400 cursor-default">
-            <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
-        </div>
-    </div>
-
-    <div class="group flex flex-col items-start min-w-0 max-w-[min(80%,32rem)]">
-        <div class="rounded-xl rounded-bl-sm px-3.5 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400 border border-red-200/60 dark:border-red-900/40 shadow-sm">
-            <strong>Something went wrong.</strong>
-            {{ error | default("A system error occurred while processing your request. Please try again in a moment.", true) }}
-        </div>
-    </div>
-</article>
+<div class="w-full max-w-4xl mx-auto p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-600 dark:text-red-400 text-xs my-2 flex items-center gap-2">
+    <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+    <span>{{ error }}</span>
+</div>

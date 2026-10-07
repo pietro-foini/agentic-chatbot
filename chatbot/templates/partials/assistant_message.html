@@ -1,15 +1,16 @@
-<article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3 htmx-added">
+<span id="chat-cost-value" hx-swap-oob="innerHTML">{{ total_cost }}</span>
+
+<article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3">
     <div class="group/avatar relative shrink-0">
         <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 cursor-default ring-2 ring-white dark:ring-ink">
             <i data-lucide="bot" class="w-4 h-4"></i>
         </div>
-        <span class="pointer-events-none absolute bottom-full mb-1.5 left-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 opacity-0 group-hover/avatar:opacity-100 transition-opacity z-20 shadow">
-            {{ response.name if response.name else 'Assistant' }}{% if response.model %} · {{ response.model }}{% endif %}
+        <span class="pointer-events-none absolute bottom-full mb-1.5 left-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 hidden group-hover/avatar:block z-20 shadow">
+            {{ response.name }}
         </span>
     </div>
 
     <div class="group flex flex-col items-start min-w-0 max-w-[min(80%,36rem)]">
-
         {% if response.image %}
         <div class="mb-2">
             <img
@@ -24,7 +25,6 @@
         <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800 shadow-sm">{{ response.content }}</div>
 
         <div class="flex items-center gap-4 mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity w-full">
-
             <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 focus-visible:outline-none h-6">
                 <i data-lucide="copy" class="icon-copy w-3.5 h-3.5"></i>
                 <i data-lucide="check" class="icon-check w-3.5 h-3.5 hidden"></i>
@@ -32,30 +32,16 @@
             </button>
 
             {% if response.pdf %}
-            <a
-              href="{{ response.pdf }}"
-              download="document.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors"
-              title="Download PDF"
-            >
-              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-              <span>PDF</span>
+            <a href="{{ response.pdf }}" download="document.pdf" target="_blank" rel="noopener noreferrer" class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors" title="Download PDF">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                <span>PDF</span>
             </a>
             {% endif %}
 
             {% if response.table %}
-            <a
-              href="{% if not response.table.startswith('data:') %}data:text/csv;base64,{% endif %}{{ response.table }}"
-              download="table.csv"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors"
-              title="Download CSV"
-            >
-              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
-              <span>CSV</span>
+            <a href="{% if not response.table.startswith('data:') %}data:text/csv;base64,{% endif %}{{ response.table }}" download="table.csv" target="_blank" rel="noopener noreferrer" class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors" title="Download CSV">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                <span>CSV</span>
             </a>
             {% endif %}
 
@@ -77,14 +63,6 @@
                 </div>
             </details>
             {% endif %}
-
         </div>
     </div>
 </article>
-
-{% if total_cost %}
-<div id="chat-cost-badge" hx-swap-oob="outerHTML" class="text-[11px] font-mono font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1 rounded-full border border-neutral-200/50 dark:border-neutral-700/50 flex items-center gap-1.5 select-none transition-all" title="Input: {{ in_tokens }} tkn · Output: {{ out_tokens }} tkn">
-    <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0"></i>
-    <span id="chat-cost-value">{{ total_cost }}</span>
-</div>
-{% endif %}

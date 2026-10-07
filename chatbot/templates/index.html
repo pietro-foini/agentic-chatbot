@@ -33,16 +33,7 @@
         }
     </script>
     <style>
-        @media (prefers-reduced-motion: no-preference) {
-            #chat-messages article, #chat-messages form {
-                transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-            }
-            #chat-messages article.htmx-added, #chat-messages form.htmx-added {
-                opacity: 0;
-                transform: translateY(4px);
-            }
-        }
-        #chat-messages:has(article, form) .empty-state {
+        #chat-messages:has(article, .chat-bubble) .empty-state {
             display: none;
         }
 
@@ -80,7 +71,6 @@
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-neutral-950/40 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
 
     <aside class="w-72 bg-neutral-50 dark:bg-neutral-900/90 border-r border-neutral-200/80 dark:border-neutral-800/80 flex flex-col h-full shrink-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-40">
-
         <div class="p-4 border-b border-neutral-200/70 dark:border-neutral-800/70 space-y-3">
             <div class="flex items-center gap-2.5 px-1 py-0.5">
                 <div class="w-8 h-8 rounded-xl bg-pine-600/10 dark:bg-pine-400/15 flex items-center justify-center text-pine-600 dark:text-pine-400 font-bold text-sm">
@@ -127,14 +117,13 @@
                 </summary>
 
                 <div class="absolute left-0 bottom-full mb-2 w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-3 flex flex-col gap-3 z-30">
-
                     {% if user %}
                     <div class="flex items-center gap-2.5 px-1 py-0.5">
                         <div class="w-7 h-7 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center shrink-0">
                             <i data-lucide="user" class="w-3.5 h-3.5"></i>
                         </div>
                         <div class="flex flex-col min-w-0">
-                            <span class="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate">{{ user.full_name or user.username }}</span>
+                            <span id="current-user-name" class="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate">{{ user.full_name or user.username }}</span>
                             <span class="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">{{ user.email }}</span>
                         </div>
                     </div>
@@ -206,7 +195,6 @@
     </aside>
 
     <main class="flex-1 flex flex-col relative h-full min-w-0">
-
         <header class="h-12 px-3 border-b border-neutral-200/70 dark:border-neutral-800/70 flex items-center justify-between shrink-0 bg-white dark:bg-ink z-10">
             <button
                 type="button"
@@ -231,7 +219,6 @@
         </header>
 
         <div id="chat-messages" class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-
             {% if not messages %}
                 <div class="empty-state m-auto text-center max-w-xs">
                     <div class="mx-auto mb-3 w-12 h-12 rounded-2xl bg-pine-600/10 dark:bg-pine-400/10 flex items-center justify-center">
@@ -245,8 +232,7 @@
             {% for msg in messages %}
                 {% if msg.type == 'human' %}
                     <article class="w-full max-w-4xl mx-auto flex items-start justify-end gap-3">
-                        <div class="group flex flex-col items-end min-w-0 max-w-[min(80%,36rem)]">
-
+                        <div class="group flex flex-col items-end min-w-0 max-w-[min(85%,38rem)] w-fit">
                             {% if msg.attachment %}
                                 <div class="mb-1.5 flex items-center gap-2 bg-pine-700 text-white text-xs px-3 py-1.5 rounded-xl">
                                     <i data-lucide="paperclip" class="w-4 h-4 shrink-0"></i>
@@ -255,7 +241,7 @@
                             {% endif %}
 
                             {% if msg.content %}
-                                <div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white shadow-sm">{{ msg.content }}</div>
+                                <div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white shadow-sm w-fit">{{ msg.content }}</div>
                             {% endif %}
 
                             <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn mt-1.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity focus-visible:outline-none">
@@ -269,7 +255,7 @@
                             <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default ring-2 ring-white dark:ring-ink">
                                 <i data-lucide="user" class="w-4 h-4"></i>
                             </div>
-                            <span class="pointer-events-none absolute bottom-full mb-1.5 right-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 opacity-0 group-hover/avatar:opacity-100 transition-opacity z-20 shadow">
+                            <span class="pointer-events-none absolute bottom-full mb-1.5 right-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 hidden group-hover/avatar:block z-20 shadow">
                                 {{ msg.name if msg.name else 'User' }}
                             </span>
                         </div>
@@ -280,13 +266,12 @@
                             <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 cursor-default ring-2 ring-white dark:ring-ink">
                                 <i data-lucide="bot" class="w-4 h-4"></i>
                             </div>
-                            <span class="pointer-events-none absolute bottom-full mb-1.5 left-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 opacity-0 group-hover/avatar:opacity-100 transition-opacity z-20 shadow">
+                            <span class="pointer-events-none absolute bottom-full mb-1.5 left-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 hidden group-hover/avatar:block z-20 shadow">
                                 {{ msg.name if msg.name else 'Assistant' }}
                             </span>
                         </div>
 
-                        <div class="group flex flex-col items-start min-w-0 max-w-[min(80%,36rem)]">
-
+                        <div class="group flex flex-col items-start min-w-0 max-w-[min(88%,44rem)] w-fit">
                             {% if msg.image %}
                             <div class="mb-2">
                                 <img
@@ -298,10 +283,9 @@
                             </div>
                             {% endif %}
 
-                            <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800 shadow-sm">{{ msg.content }}</div>
+                            <div class="rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-neutral-100 dark:bg-neutral-800 shadow-sm w-fit">{{ msg.content }}</div>
 
                             <div class="flex items-center gap-4 mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity w-full">
-
                                 <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 focus-visible:outline-none h-6">
                                     <i data-lucide="copy" class="icon-copy w-3.5 h-3.5"></i>
                                     <i data-lucide="check" class="icon-check w-3.5 h-3.5 hidden"></i>
@@ -309,28 +293,14 @@
                                 </button>
 
                                 {% if msg.pdf %}
-                                <a
-                                  href="{{ msg.pdf }}"
-                                  download="document.pdf"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors"
-                                  title="Download PDF"
-                                >
+                                <a href="{{ msg.pdf }}" download="document.pdf" target="_blank" rel="noopener noreferrer" class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors" title="Download PDF">
                                   <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
                                   <span>PDF</span>
                                 </a>
                                 {% endif %}
 
                                 {% if msg.table %}
-                                <a
-                                  href="{% if not msg.table.startswith('data:') %}data:text/csv;base64,{% endif %}{{ msg.table }}"
-                                  download="table.csv"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors"
-                                  title="Download CSV"
-                                >
+                                <a href="{% if not msg.table.startswith('data:') %}data:text/csv;base64,{% endif %}{{ msg.table }}" download="table.csv" target="_blank" rel="noopener noreferrer" class="shrink-0 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-pine-600 dark:hover:text-pine-400 focus-visible:outline-none h-6 transition-colors" title="Download CSV">
                                   <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
                                   <span>CSV</span>
                                 </a>
@@ -354,7 +324,6 @@
                                     </div>
                                 </details>
                                 {% endif %}
-
                             </div>
                         </div>
                     </article>
@@ -366,8 +335,8 @@
             <form
                 id="chat-form"
                 hx-post="/chat/{{ thread_id }}"
-                hx-target="#chat-messages"
-                hx-swap="beforeend"
+                hx-target="#chat-indicator"
+                hx-swap="outerHTML"
                 hx-encoding="multipart/form-data"
                 hx-include="#model-select"
                 class="flex flex-col gap-2 max-w-4xl mx-auto bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-2 pl-4 focus-within:ring-2 focus-within:ring-pine-600 dark:focus-within:ring-pine-400 transition-shadow"
@@ -409,6 +378,11 @@
 
         document.body.addEventListener('htmx:afterSwap', () => {
             lucide.createIcons();
+            document.body.classList.remove('is-generating');
+            submitBtn.disabled = false;
+            textarea.disabled = false;
+            textarea.focus();
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
         });
 
         const textarea = document.getElementById('chat-textarea');
@@ -418,6 +392,8 @@
         const backdrop = document.getElementById('sidebar-backdrop');
         const modelSelect = document.getElementById('model-select');
         const activeModelName = document.getElementById('active-model-name');
+        const userNameEl = document.getElementById('current-user-name');
+        const currentUserName = userNameEl ? userNameEl.textContent.trim() : 'User';
 
         function syncModelBadge(name) {
             if (activeModelName) activeModelName.textContent = name;
@@ -481,9 +457,65 @@
             }
         });
 
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g,
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
         form.addEventListener('submit', () => {
+            const text = textarea.value.trim();
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+
             document.body.classList.add('is-generating');
             submitBtn.disabled = true;
+
+            const emptyState = chatContainer.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            let fileHtml = '';
+            if (file) {
+                fileHtml = `
+                    <div class="mb-1.5 flex items-center gap-2 bg-pine-700 text-white text-xs px-3 py-1.5 rounded-xl">
+                        <i data-lucide="paperclip" class="w-4 h-4 shrink-0"></i>
+                        <span class="truncate font-medium">${escapeHTML(file.name)}</span>
+                    </div>
+                `;
+            }
+
+            const userMessageHtml = `
+                <article class="chat-bubble w-full max-w-4xl mx-auto flex items-start justify-end gap-3">
+                    <div class="group flex flex-col items-end min-w-0 max-w-[min(85%,38rem)] w-fit">
+                        ${fileHtml}
+                        ${text ? `<div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white shadow-sm w-fit">${escapeHTML(text)}</div>` : ''}
+                    </div>
+                    <div class="group/avatar relative shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default ring-2 ring-white dark:ring-ink">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </div>
+                        <span class="pointer-events-none absolute bottom-full mb-1.5 right-0 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-[11px] font-medium px-2 py-0.5 hidden group-hover/avatar:block z-20 shadow">
+                            ${escapeHTML(currentUserName)}
+                        </span>
+                    </div>
+                </article>
+            `;
+
+            const indicatorHtml = `
+                <div id="chat-indicator" class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 ring-2 ring-white dark:ring-ink">
+                        <i data-lucide="bot" class="w-4 h-4"></i>
+                    </div>
+                    <div class="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800/80 px-4 py-2.5 rounded-2xl rounded-bl-sm border border-neutral-200/50 dark:border-neutral-700/50 text-neutral-500 text-xs shadow-sm">
+                        <div class="w-2 h-2 rounded-full bg-pine-500 animate-pulse"></div>
+                        <span>Assistant is thinking...</span>
+                    </div>
+                </div>
+            `;
+
+            chatContainer.insertAdjacentHTML('beforeend', userMessageHtml + indicatorHtml);
+            lucide.createIcons();
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
 
             setTimeout(() => {
                 form.reset();
@@ -491,19 +523,6 @@
                 textarea.style.height = 'auto';
             }, 20);
         });
-
-        const observer = new MutationObserver(() => {
-            const isAssistantStillLoading = chatContainer.querySelector('form[hx-post*="/assistant"]');
-
-            if (document.body.classList.contains('is-generating') && !isAssistantStillLoading) {
-                document.body.classList.remove('is-generating');
-                submitBtn.disabled = false;
-                textarea.disabled = false;
-                textarea.focus();
-            }
-        });
-
-        observer.observe(chatContainer, { childList: true, subtree: true });
 
         function updateFilePreview(input) {
             const preview = document.getElementById('file-preview');
@@ -567,7 +586,7 @@
                     }, 1800);
                 }
             } catch (err) {
-                console.error('Errore durante la copia:', err);
+                console.error('Error copying message:', err);
             }
         }
 

@@ -36,7 +36,7 @@ from chatbot.graphs.config import ALL_TOOLS
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.llm.config import CATEGORIZED_MODELS, get_model
-from chatbot.schemas import Attachment, UserResponse
+from chatbot.schemas import Attachment
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 from chatbot.utils import extract_assistant_response, parse_messages
@@ -119,111 +119,81 @@ async def get_chat(
             "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
             "default_model": S.MODEL_NAME,
             "chat_cost": f"${total_cost:.5f}",
+            "user": current_user,
         },
     )
 
 
 @chat_router.post(path="/chat/{thread_id}", response_class=HTMLResponse)
-async def add_user_message(
+async def process_chat(
     request: Request,
     thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-    message: str = Form(..., max_length=500),
-    file: UploadFile | None = File(None),
-):
-    """Post a user message to the chat history for the given ID thread"""
-
-    message = message.strip()
-
-    if not message:
-        return RedirectResponse(url=f"/chat/{thread_id}", status_code=303)
-
-    # Handle the allowed optional attachment file.
-    attachment = None
-    if file and file.filename and file.content_type and file.size:
-        size_kb = round(file.size / 1024, 2)
-        if file.content_type not in ALLOWED_MIME_TYPES:
-            return templates.TemplateResponse(
-                request=request,
-                name="partials/error_message.html",
-                context={"error": "File type not allowed."},
-            )
-        if size_kb > S.MAX_ATTACHMENTS_SIZE:
-            return templates.TemplateResponse(
-                request=request,
-                name="partials/error_message.html",
-                context={"error": f"The maximum allowed file size is {S.MAX_ATTACHMENTS_SIZE}KB."},
-            )
-
-        # Download file.
-        content_bytes = await file.read()
-
-        # Upload on Google Cloud Storage in order to keep them tracked.
-        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
-        filename = f"{uuid.uuid4()}_{safe_name}"
-        bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
-        blob = bucket.blob(f"attachments/{filename}")
-        await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=file.content_type)
-
-        # Create attachment object.
-        attachment = Attachment(
-            id=filename,
-            file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{filename}",
-            type=file.content_type,
-            size=f"{size_kb}KB",
-        )
-
-    # Create user response.
-    user_message = UserResponse(
-        id=str(uuid.uuid4()),
-        name=current_user.username or "user",
-        content=message,
-        attachment=attachment,
-    )
-
-    # Add valid thread information to the thread table if not already exists.
-    stmt = (
-        insert(ThreadModel)
-        .values(
-            thread_id=thread_id,
-            user_id=str(current_user.id),
-        )
-        .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
-    )
-    await session.execute(stmt)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="partials/message_pair.html",
-        context={
-            "user_message": user_message,
-            "thread_id": str(thread_id),
-        },
-    )
-
-
-@chat_router.post(path="/chat/{thread_id}/assistant", response_class=HTMLResponse)
-async def add_assistant_message(
-    request: Request,
-    thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
-    current_user: Annotated[UserModel, Depends(get_current_user)],
     vector_store: PGVectorStore = Depends(get_vector_store),
-    user_message_json: str | None = Form(None),
+    message: str | None = Form(None, max_length=500),
+    file: UploadFile | None = File(None),
     approved: str | None = Form(None),
     reason: str | None = Form(None),
     model_name: str | None = Form(None),
 ):
-    """Generate an assistant message for the given ID thread"""
+    """Post a user message to assistant conversation to the chat history for the given ID thread"""
 
-    # Define input for the graph execution.
-    if user_message_json:
-        user_message = UserResponse.model_validate_json(user_message_json)
-        content = [{"type": "text", "text": user_message.content}]
+    if approved is not None:  # Human into the loop
+        is_approved = approved.lower() == "true"
+        decisions = (
+            [{"type": "approve"}]
+            if is_approved
+            else [{"type": "reject", "message": reason or "Action rejected by user."}]
+        )
+        graph_input = Command(resume={"decisions": decisions})
+    elif message and message.strip():  # New user message
+        message = message.strip()
+
+        attachment = None
+        if file and file.filename and file.content_type and file.size:
+            size_kb = round(file.size / 1024, 2)
+            if file.content_type not in ALLOWED_MIME_TYPES:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="partials/error_message.html",
+                    context={"error": "File type not allowed."},
+                )
+            if size_kb > S.MAX_ATTACHMENTS_SIZE:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="partials/error_message.html",
+                    context={"error": f"The maximum allowed file size is {S.MAX_ATTACHMENTS_SIZE}KB."},
+                )
+
+            content_bytes = await file.read()
+            safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
+            file_id = f"{uuid.uuid4()}_{safe_name}"
+
+            bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
+            blob = bucket.blob(f"attachments/{file_id}")
+            await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=file.content_type)
+
+            attachment = Attachment(
+                id=file_id,
+                file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{file_id}",
+                type=file.content_type,
+                size=f"{size_kb}KB",
+            )
+
+        # Ensure the thread exist.
+        stmt = (
+            insert(ThreadModel)
+            .values(thread_id=thread_id, user_id=str(current_user.id))
+            .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
+        )
+        await session.execute(stmt)
+
+        # Create message for graph execution.
+        content = [{"type": "text", "text": message}]
         additional_kwargs = {}
-
-        if attachment := user_message.attachment:
+        if attachment:
             content.append(
                 {
                     "type": "media",
@@ -236,38 +206,27 @@ async def add_assistant_message(
                 "size": attachment.size,
             }
 
-        message = HumanMessage(
-            id=user_message.id,
-            name=user_message.name,
+        graph_msg = HumanMessage(
+            id=str(uuid.uuid4()),
+            name=current_user.username or "user",
             content=content,
             additional_kwargs=additional_kwargs,
         )
         graph_input = {
-            "messages": [message],
+            "messages": [graph_msg],
             "user_preferences": {"style": "technical", "verbosity": "detailed"},
         }
-    elif approved is not None:
-        is_approved = approved.lower() == "true"
-        decisions = (
-            [{"type": "approve"}]
-            if is_approved
-            else [{"type": "reject", "message": reason or "Action rejected by user."}]
-        )
-        graph_input = Command(resume={"decisions": decisions})
     else:
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": "Request not valid: no message or decision provided."},
+            context={"error": "Not Valid message."},
         )
 
     # Define the graph configuration.
     config = RunnableConfig(
         configurable={"thread_id": str(thread_id)},
-        metadata={
-            "user_id": str(current_user.id),
-            "username": current_user.username,
-        },
+        metadata={"user_id": str(current_user.id), "username": current_user.username},
         recursion_limit=S.RECURSION_LIMIT,
     )
     context = Context(
@@ -290,16 +249,11 @@ async def add_assistant_message(
             config=config,
             context=context,
         )
-    except (
-        GraphRecursionError,
-        ChatGoogleGenerativeAIError,
-        ValueError,
-        ServerError,
-    ):
+    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError):
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": "A system error occurred while processing your request. Please try again in a moment."},
+            context={"error": "A system error occurred while processing your request. Please try again."},
         )
 
     # Check for interrupt.
@@ -321,10 +275,7 @@ async def add_assistant_message(
     # Get messages.
     messages = response["messages"]
     start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
-    messages = messages[start_idx:]
-
-    # Create assistant response.
-    assistant_message = await extract_assistant_response(str(thread_id), messages)
+    assistant_message = await extract_assistant_response(str(thread_id), messages[start_idx:])
 
     return templates.TemplateResponse(
         request=request,
