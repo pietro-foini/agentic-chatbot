@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import UploadFile
 
+from chatbot.errors import UserFacingError
 from chatbot.schemas.chat import Attachment
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
