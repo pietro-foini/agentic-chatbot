@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from google.genai.errors import ServerError
 from langchain_core.messages import HumanMessage
@@ -55,7 +55,7 @@ async def new_chat():
     return RedirectResponse(url=f"/chat/{thread_id}", status_code=303, headers={"Cache-Control": "no-store"})
 
 
-@chat_router.delete(path="/chat", response_class=HTMLResponse)
+@chat_router.delete(path="/chat", response_class=Response)
 async def delete_chats(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -81,7 +81,7 @@ async def delete_chats(
             for item in items:
                 await store.adelete(item.namespace, item.key)
 
-    return HTMLResponse(headers={"HX-Redirect": "/"})
+    return Response(status_code=204, headers={"HX-Redirect": "/"})
 
 
 @chat_router.get(path="/chat/{thread_id}", response_class=HTMLResponse)
