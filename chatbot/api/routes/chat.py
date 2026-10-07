@@ -65,13 +65,13 @@ async def delete_chats(
     """Delete all the chat threads information belonging to the current user"""
 
     # Retrieve the list of all the threads of the current user.
-    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
+    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == current_user.id)
     threads = (await session.execute(query)).scalars().all()
 
     # TODO: maybe it could be optimized for a production scenario with many threads per user or add limit to chat threads.
     if threads:
         # Delete threads from main dataset.
-        await session.execute(delete(ThreadModel).where(ThreadModel.user_id == str(current_user.id)))
+        await session.execute(delete(ThreadModel).where(ThreadModel.user_id == current_user.id))
 
         # Delete all the thread information from graph checkpointer.
         for thread in threads:
@@ -106,7 +106,7 @@ async def get_chat(
     parsed_messages = await parse_messages(str(thread_id), messages)
 
     # Retrieve the list of all the threads of the current user.
-    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == str(current_user.id))
+    query = select(ThreadModel.thread_id).where(ThreadModel.user_id == current_user.id)
     threads = (await session.execute(query)).scalars().all()
 
     return templates.TemplateResponse(
