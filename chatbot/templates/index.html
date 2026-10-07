@@ -142,26 +142,11 @@
                                 onchange="onModelChange(this.value)"
                                 class="w-full appearance-none bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs rounded-xl px-3 py-2 pr-8 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-pine-600 dark:focus:ring-pine-400 cursor-pointer"
                             >
-                                {% if model_categories %}
-                                    {% for category, models in model_categories.items() %}
-                                        <optgroup label="── {{ category }} ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
-                                            {% for m in models %}
-                                                <option value="{{ m }}" {% if m == default_model %}selected{% endif %} class="text-neutral-900 dark:text-neutral-100 font-normal">
-                                                    {{ m }}
-                                                </option>
-                                            {% endfor %}
-                                        </optgroup>
-                                    {% endfor %}
-                                {% else %}
-                                    <optgroup label="── Proprietary ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
-                                        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                                    </optgroup>
-                                    <optgroup label="── Open-Source ──" class="font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-900">
-                                        <option value="llama3.2">llama3.2</option>
-                                        <option value="mistral">mistral</option>
-                                    </optgroup>
-                                {% endif %}
+                            {% for m in models %}
+                                <option value="{{ m }}" {% if m == default_model %}selected{% endif %} class="text-neutral-900 dark:text-neutral-100 font-normal">
+                                    {{ m }}
+                                </option>
+                            {% endfor %}
                             </select>
                             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
                                 <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
@@ -208,7 +193,7 @@
             <div class="flex items-center gap-2">
                 <div id="chat-cost-badge" class="text-[11px] font-mono font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1 rounded-full border border-neutral-200/50 dark:border-neutral-700/50 flex items-center gap-1.5 select-none" title="Chat cost">
                     <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0"></i>
-                    <span id="chat-cost-value">{{ chat_cost if chat_cost else '$0.00000' }}</span>
+                    <span id="chat-cost-value">${{ '%.5f'|format(total_cost) }}</span>
                 </div>
 
                 <div id="active-model-badge" class="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2.5 py-1 rounded-full border border-neutral-200/50 dark:border-neutral-700/50 flex items-center gap-1.5">

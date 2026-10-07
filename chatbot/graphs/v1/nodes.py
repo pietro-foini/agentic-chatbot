@@ -152,7 +152,6 @@ async def call_model(state: State, config: RunnableConfig, runtime: Runtime):
     model_response.response_metadata["timestamp"] = datetime.now(ZoneInfo("Europe/Berlin")).strftime(
         "%Y-%m-%d %H:%M:%S"
     )
-    model_response.name = runtime.context.chatbot_name
 
     return Command(update={"messages": [model_response]})
 

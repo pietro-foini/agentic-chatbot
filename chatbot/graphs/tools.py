@@ -14,17 +14,18 @@ from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
 from chatbot.db.postgres import PostgresAsyncHandler
-from chatbot.graphs.data import DBName, Source
-from chatbot.graphs.schemas import (
+from chatbot.graphs.security import validate_plot_code
+from chatbot.graphs.state import Context
+from chatbot.schemas.tools import (
     CodePlotInput,
+    DBName,
     DescribeTableInput,
     ListTablesInput,
     PDFRetrieveInput,
     RAGInput,
+    Source,
     SQLQueryInput,
 )
-from chatbot.graphs.security import validate_plot_code
-from chatbot.graphs.state import Context
 from chatbot.settings import S
 from chatbot.storage.config import storage_client
 

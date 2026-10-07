@@ -22,7 +22,7 @@ from chatbot.db.config import checkpointer, store
 from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.utils import extract_model_name
-from chatbot.llm.config import get_model
+from chatbot.llm.config import MODELS
 from chatbot.llm.pricing import compute_cost
 from chatbot.settings import S
 
@@ -121,7 +121,7 @@ async def track_tool_metrics(
 # Create the graph instance.
 # noinspection PyTypeChecker
 LangGraphAgent = create_agent(
-    model=get_model(S.MODEL_NAME),
+    model=MODELS[S.MODEL_NAME],
     tools=ALL_TOOLS,
     state_schema=State,
     context_schema=Context,

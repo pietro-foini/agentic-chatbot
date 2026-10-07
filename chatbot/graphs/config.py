@@ -17,3 +17,5 @@ ALL_TOOLS = [
 ]
 
 SENSITIVE_TOOLS = {download_and_analyze_pdf_from_gcs.name}
+
+DEFAULT_USER_PREFERENCES = {"style": "technical", "verbosity": "detailed"}

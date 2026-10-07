@@ -1,15 +1,54 @@
 import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langgraph.types import Command
 from more_itertools import split_before
 
 from chatbot.db.config import store
-from chatbot.schemas import AssistantResponse, Attachment, ThinkingStep, UserResponse
+from chatbot.db.models import UserModel
+from chatbot.schemas.chat import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
 
-async def parse_messages(
-    thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]
-) -> list[UserResponse | AssistantResponse]:
+def get_last_turn_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
+    """Messages starting from the latest HumanMessage"""
+
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], HumanMessage):
+            return messages[i:]
+
+    return []
+
+
+def build_human_message(user: UserModel, text: str, attachment: Attachment | None) -> HumanMessage:
+    """Build a HumanMessage from the provided data"""
+
+    content: list[dict] = [{"type": "text", "text": text}]
+    additional_kwargs: dict = {}
+
+    if attachment:
+        content.append({"type": "media", "mime_type": attachment.type, "file_uri": attachment.file_uri})
+        additional_kwargs["file_metadata"] = {"id": attachment.id, "size": attachment.size}
+
+    return HumanMessage(
+        id=str(uuid.uuid4()),
+        name=user.username or "user",
+        content=content,
+        additional_kwargs=additional_kwargs,
+    )
+
+
+def build_resume_command(approved: str, reason: str | None) -> Command:
+    """Build resume command"""
+
+    if approved.lower() == "true":
+        decisions = [{"type": "approve"}]
+    else:
+        decisions = [{"type": "reject", "message": reason or "Action rejected by user."}]
+
+    return Command(resume={"decisions": decisions})
+
+
+async def parse_messages(thread_id: str, messages: list[BaseMessage]) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
 
@@ -28,7 +67,7 @@ async def parse_messages(
     return parsed_messages
 
 
-async def extract_user_response(thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]) -> UserResponse:
+async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> UserResponse:
     """
     Extract the user response.
 
@@ -76,9 +115,7 @@ async def extract_user_response(thread_id: str, messages: list[HumanMessage | To
     return response
 
 
-async def extract_assistant_response(
-    thread_id: str, messages: list[HumanMessage | ToolMessage | AIMessage]
-) -> AssistantResponse:
+async def extract_assistant_response(thread_id: str, messages: list[BaseMessage]) -> AssistantResponse:
     """
     Extract the assistant response.
 

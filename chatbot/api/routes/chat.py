@@ -1,5 +1,3 @@
-import asyncio
-import re
 import uuid
 from pathlib import Path
 from typing import Annotated
@@ -8,7 +6,6 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from google.genai.errors import ServerError
-from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_postgres import PGVectorStore
@@ -16,13 +13,11 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
-from langgraph.types import Command
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.api.dependencies import (
-    ALLOWED_MIME_TYPES,
     get_checkpointer,
     get_current_user,
     get_graph,
@@ -32,14 +27,20 @@ from chatbot.api.dependencies import (
     get_vector_store,
 )
 from chatbot.db.models import ThreadModel, UserModel
-from chatbot.graphs.config import ALL_TOOLS
+from chatbot.errors import UserFacingError
+from chatbot.graphs.config import ALL_TOOLS, DEFAULT_USER_PREFERENCES
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.llm.config import CATEGORIZED_MODELS, get_model
-from chatbot.schemas import Attachment
+from chatbot.llm.config import MODELS
+from chatbot.services.attachment import save_attachment
+from chatbot.services.chat import (
+    build_human_message,
+    build_resume_command,
+    extract_assistant_response,
+    get_last_turn_messages,
+    parse_messages,
+)
 from chatbot.settings import S
-from chatbot.storage.config import storage_client
-from chatbot.utils import extract_assistant_response, parse_messages
 
 chat_router = APIRouter(tags=["Chat"])
 
@@ -68,12 +69,13 @@ async def delete_chats(
     query = select(ThreadModel.thread_id).where(ThreadModel.user_id == current_user.id)
     threads = (await session.execute(query)).scalars().all()
 
-    # TODO: maybe it could be optimized for a production scenario with many threads per user or add limit to chat threads.
+    # TODO: maybe it could be optimized for a production scenario with many threads per user or add
+    #  limit to chat threads.
     if threads:
         # Delete threads from main dataset.
         await session.execute(delete(ThreadModel).where(ThreadModel.user_id == current_user.id))
 
-        # Delete all the thread information from graph checkpointer.
+        # Delete all the thread information from graph checkpointer saver.
         for thread in threads:
             await checkpointer.adelete_thread(str(thread))
             # Delete all the thread information from graph store artifacts.
@@ -101,8 +103,6 @@ async def get_chat(
     # Retrieve chat data.
     messages = values.get("messages", [])
     total_cost = values.get("total_cost", 0)
-
-    # Parse messages for UI rendering purposes.
     parsed_messages = await parse_messages(str(thread_id), messages)
 
     # Retrieve the list of all the threads of the current user.
@@ -116,9 +116,9 @@ async def get_chat(
             "messages": parsed_messages,
             "thread_id": str(thread_id),
             "threads": [str(thread) for thread in threads],
-            "model_categories": {category: list(models.keys()) for category, models in CATEGORIZED_MODELS.items()},
+            "models": list(MODELS),
             "default_model": S.MODEL_NAME,
-            "chat_cost": f"${total_cost:.5f}",
+            "total_cost": total_cost,
             "user": current_user,
         },
     )
@@ -140,90 +140,34 @@ async def process_chat(
 ):
     """Post a user message to assistant conversation to the chat history for the given ID thread"""
 
-    if approved is not None:  # Human into the loop
-        is_approved = approved.lower() == "true"
-        decisions = (
-            [{"type": "approve"}]
-            if is_approved
-            else [{"type": "reject", "message": reason or "Action rejected by user."}]
-        )
-        graph_input = Command(resume={"decisions": decisions})
-    elif message and message.strip():  # New user message
-        message = message.strip()
-
-        attachment = None
-        if file and file.filename and file.content_type and file.size:
-            size_kb = round(file.size / 1024, 2)
-            if file.content_type not in ALLOWED_MIME_TYPES:
-                return templates.TemplateResponse(
-                    request=request,
-                    name="partials/error_message.html",
-                    context={"error": "File type not allowed."},
-                )
-            if size_kb > S.MAX_ATTACHMENTS_SIZE:
-                return templates.TemplateResponse(
-                    request=request,
-                    name="partials/error_message.html",
-                    context={"error": f"The maximum allowed file size is {S.MAX_ATTACHMENTS_SIZE}KB."},
-                )
-
-            content_bytes = await file.read()
-            safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
-            file_id = f"{uuid.uuid4()}_{safe_name}"
-
-            bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
-            blob = bucket.blob(f"attachments/{file_id}")
-            await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=file.content_type)
-
-            attachment = Attachment(
-                id=file_id,
-                file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{file_id}",
-                type=file.content_type,
-                size=f"{size_kb}KB",
+    try:
+        if approved is not None:  # Human into the loop
+            # Prepare input for graph execution.
+            graph_input = build_resume_command(approved, reason)
+        elif message and message.strip():  # New message
+            # Prepare attachment.
+            attachment = await save_attachment(file)
+            # Prepare human message.
+            human_message = build_human_message(current_user, message.strip(), attachment)
+            # Prepare input for graph execution.
+            graph_input = {"messages": [human_message], "user_preferences": DEFAULT_USER_PREFERENCES}
+            # Create the thread record into the reference table if not already exist (idempotency).
+            stmt = (
+                insert(ThreadModel)
+                .values(thread_id=thread_id, user_id=str(current_user.id))
+                .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
             )
-
-        # Ensure the thread exist.
-        stmt = (
-            insert(ThreadModel)
-            .values(thread_id=thread_id, user_id=str(current_user.id))
-            .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
-        )
-        await session.execute(stmt)
-
-        # Create message for graph execution.
-        content = [{"type": "text", "text": message}]
-        additional_kwargs = {}
-        if attachment:
-            content.append(
-                {
-                    "type": "media",
-                    "mime_type": attachment.type,
-                    "file_uri": attachment.file_uri,
-                }
-            )
-            additional_kwargs["file_metadata"] = {
-                "id": attachment.id,
-                "size": attachment.size,
-            }
-
-        graph_msg = HumanMessage(
-            id=str(uuid.uuid4()),
-            name=current_user.username or "user",
-            content=content,
-            additional_kwargs=additional_kwargs,
-        )
-        graph_input = {
-            "messages": [graph_msg],
-            "user_preferences": {"style": "technical", "verbosity": "detailed"},
-        }
-    else:
+            await session.execute(stmt)
+        else:
+            raise UserFacingError("Please write a message.")
+    except UserFacingError as e:
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
-            context={"error": "Not Valid message."},
+            context={"error": str(e)},
         )
 
-    # Define the graph configuration.
+    # Define the graph setting.
     config = RunnableConfig(
         configurable={"thread_id": str(thread_id)},
         metadata={"user_id": str(current_user.id), "username": current_user.username},
@@ -231,57 +175,46 @@ async def process_chat(
     )
     context = Context(
         thread_id=str(thread_id),
-        chatbot_name=S.CHATBOT_NAME,
-        model=get_model(model_name or S.MODEL_NAME),
-        system_prompt=SYSTEM_PROMPT.format(
-            user_name=current_user.username or "user",
-            bot_name=S.CHATBOT_NAME,
-        ),
+        model=MODELS.get(model_name, S.MODEL_NAME),
+        system_prompt=SYSTEM_PROMPT.format(user_name=current_user.username, bot_name=S.CHATBOT_NAME),
         tools=ALL_TOOLS,
         vector_store=vector_store,
     )
 
     # Graph execution.
     try:
-        response = await graph.ainvoke(
-            graph_input,
-            stream_mode="values",
-            config=config,
-            context=context,
+        response = await graph.ainvoke(graph_input, stream_mode="values", config=config, context=context)
+    except ServerError:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/error_message.html",
+            context={"error": "The AI service is temporarily unavailable. Please try again in a moment."},
         )
-    except (GraphRecursionError, ChatGoogleGenerativeAIError, ValueError, ServerError):
+    except (GraphRecursionError, ChatGoogleGenerativeAIError):
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
             context={"error": "A system error occurred while processing your request. Please try again."},
         )
 
-    # Check for interrupt.
+    # Check for a new interrupt.
     state_snapshot = await graph.aget_state(config)
     if state_snapshot.next:
         pending_interrupt = state_snapshot.tasks[0].interrupts[0].value
         return templates.TemplateResponse(
             request=request,
             name="partials/approval_request.html",
-            context={
-                "thread_id": str(thread_id),
-                "approval_info": pending_interrupt,
-            },
+            context={"thread_id": str(thread_id), "approval_info": pending_interrupt},
         )
 
+    # Get assistant message.
+    current_messages = get_last_turn_messages(response["messages"])
+    assistant_message = await extract_assistant_response(str(thread_id), current_messages)
     # Get total cost.
     total_cost = state_snapshot.values.get("total_cost", 0)
-
-    # Get messages.
-    messages = response["messages"]
-    start_idx = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)), -1)
-    assistant_message = await extract_assistant_response(str(thread_id), messages[start_idx:])
 
     return templates.TemplateResponse(
         request=request,
         name="partials/assistant_message.html",
-        context={
-            "response": assistant_message,
-            "total_cost": f"${total_cost:.5f}",
-        },
+        context={"response": assistant_message, "total_cost": total_cost},
     )

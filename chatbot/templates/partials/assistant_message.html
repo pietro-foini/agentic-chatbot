@@ -1,4 +1,4 @@
-<span id="chat-cost-value" hx-swap-oob="innerHTML">{{ total_cost }}</span>
+<span id="chat-cost-value" hx-swap-oob="innerHTML">${{ '%.5f'|format(total_cost) }}</span>
 
 <article class="w-full max-w-4xl mx-auto flex items-start justify-start gap-3">
     <div class="group/avatar relative shrink-0">

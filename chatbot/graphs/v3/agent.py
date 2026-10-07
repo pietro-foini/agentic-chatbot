@@ -15,7 +15,7 @@ from chatbot.db.config import checkpointer, store
 from chatbot.graphs.prompts import SUPERVISOR_PROMPT
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v3.subagents import agent_1, agent_2, agent_3, agent_4
-from chatbot.llm.config import get_model
+from chatbot.llm.config import MODELS
 from chatbot.settings import S
 
 
@@ -82,7 +82,7 @@ async def dynamic_model(
 
 # noinspection PyTypeChecker
 LangGraphAgent = create_agent(
-    model=get_model(S.MODEL_NAME),
+    model=MODELS[S.MODEL_NAME],
     tools=SUPERVISOR_TOOLS,
     state_schema=State,
     context_schema=Context,

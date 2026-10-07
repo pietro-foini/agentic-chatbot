@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.api.dependencies import get_session
 from chatbot.db.models import UserModel
-from chatbot.security import create_access_token, get_password_hash, verify_password
+from chatbot.services.security import create_access_token, get_password_hash, verify_password
 from chatbot.settings import S
 
 auth_router = APIRouter(tags=["Auth"])

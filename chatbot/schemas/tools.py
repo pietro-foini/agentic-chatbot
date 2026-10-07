@@ -1,20 +1,32 @@
 import re
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
-from chatbot.graphs.data import DBName, Source
 from chatbot.graphs.security import wrap_sql_with_limit
 from chatbot.settings import S
 
 
+class Source(StrEnum):
+    """Enum representing different sources of documentation or knowledge"""
+
+    unimatica = "unimatica"
+
+
+class DBName(StrEnum):
+    """Enum representing different PostgreSQL database names available"""
+
+    cameratraps = "cameratraps"
+
+
 class ListTablesInput(BaseModel):
-    """Input schema for listing available tables"""
+    """Input schema for listing available tables on PostgreSQL"""
 
     db_name: DBName = Field(description="Name of the database whose tables to list")
 
 
 class DescribeTableInput(BaseModel):
-    """Input schema for describing a table"""
+    """Input schema for describing a table on PostgreSQL"""
 
     db_name: DBName = Field(description="Name of the database")
     table_name: str = Field(description="Name of the table to inspect")

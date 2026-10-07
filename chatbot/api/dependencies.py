@@ -16,8 +16,6 @@ from chatbot.db.config import db
 from chatbot.db.models import ThreadModel, UserModel
 from chatbot.settings import S
 
-ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg"}
-
 
 def get_graph(request: Request) -> CompiledStateGraph:
     """Return the compiled graph"""
@@ -57,11 +55,12 @@ def get_store(request: Request) -> AsyncPostgresStore:
     return request.app.state.store
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session per request lifecycle"""
 
-    async with db.get_session() as session:
+    async with request.app.state.db.session_factory() as session:
         yield session
+        await session.commit()
 
 
 async def get_current_user(

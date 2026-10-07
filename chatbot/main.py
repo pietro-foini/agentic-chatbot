@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
         app.state.graph = LangGraphAgent
         app.state.checkpointer = checkpointer
         app.state.store = store
+        app.state.db = db
         yield
     finally:  # Close connections at the application shutdown or crash.
         await connection_pool.close()

@@ -98,6 +98,10 @@ class Settings(BaseSettings):
         default=8,
         description="Maximum seconds allowed for generated plot code to run",
     )
+    ALLOWED_MIME_TYPES: list[str] = Field(
+        default=["application/pdf", "image/png", "image/jpeg"],
+        description="Allowed mime types for attachment",
+    )
 
 
 S = Settings()  # type: ignore[call-arg]

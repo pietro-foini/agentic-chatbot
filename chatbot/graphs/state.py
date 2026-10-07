@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Annotated, Required, TypedDict
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AnyMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.tools import BaseTool
 from langchain_postgres import PGVectorStore
 from langgraph.graph import add_messages
@@ -12,7 +12,7 @@ from langgraph.graph import add_messages
 class State(TypedDict):
     """Agent state"""
 
-    messages: Required[Annotated[list[AnyMessage], add_messages]]
+    messages: Required[Annotated[list[BaseMessage], add_messages]]
 
     total_cost: Annotated[float, operator.add]
 
@@ -22,7 +22,6 @@ class Context:
     """Context configuration for Agent runtime call"""
 
     thread_id: str
-    chatbot_name: str
     system_prompt: str
     model: BaseChatModel
     tools: list[BaseTool]
