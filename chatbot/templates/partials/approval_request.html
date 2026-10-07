@@ -27,7 +27,7 @@
     <div class="flex items-center gap-2.5">
         <button
             hx-post="/chat/{{ thread_id }}"
-            hx-vals='{"approved": "true"}'
+            hx-vals='{"approved": "true"{% if model_name %}, "model_name": "{{ model_name }}"{% endif %}}'
             hx-target="#approval-box-{{ thread_id }}"
             hx-swap="outerHTML"
             hx-indicator="#loader-{{ thread_id }}"
@@ -40,7 +40,7 @@
 
         <button
             hx-post="/chat/{{ thread_id }}"
-            hx-vals='{"approved": "false", "reason": "Action rejected by user."}'
+            hx-vals='{"approved": "false", "reason": "Action rejected by user."{% if model_name %}, "model_name": "{{ model_name }}"{% endif %}}'
             hx-target="#approval-box-{{ thread_id }}"
             hx-swap="outerHTML"
             hx-indicator="#loader-{{ thread_id }}"

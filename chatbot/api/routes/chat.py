@@ -194,7 +194,7 @@ async def process_chat(
         return templates.TemplateResponse(
             request=request,
             name="partials/approval_request.html",
-            context={"thread_id": str(thread_id), "approval_info": pending_interrupt},
+            context={"thread_id": str(thread_id), "approval_info": pending_interrupt, "model_name": model_name},
         )
 
     # Get assistant message.
