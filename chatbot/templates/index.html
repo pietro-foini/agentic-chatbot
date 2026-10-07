@@ -515,6 +515,12 @@
                     <div class="group flex flex-col items-end min-w-0 max-w-[min(85%,38rem)] w-fit">
                         ${fileHtml}
                         ${text ? `<div class="rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words bg-pine-600 text-white shadow-sm w-fit">${escapeHTML(text)}</div>` : ''}
+
+                        <button type="button" onclick="copyMessage(this)" aria-label="Copy message" class="copy-btn mt-1.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity focus-visible:outline-none">
+                            <i data-lucide="copy" class="icon-copy w-3.5 h-3.5"></i>
+                            <i data-lucide="check" class="icon-check w-3.5 h-3.5 hidden"></i>
+                            <span class="label">Copy</span>
+                        </button>
                     </div>
                     <div class="group/avatar relative shrink-0">
                         <div class="w-8 h-8 rounded-full bg-pine-600/20 text-pine-600 dark:bg-pine-400/20 dark:text-pine-400 flex items-center justify-center cursor-default ring-2 ring-white dark:ring-ink">
