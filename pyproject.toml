@@ -16,6 +16,7 @@ python-multipart = "0.0.32"
 # Data Processing & Config
 pydantic = { version = "2.13.5", extras = ["email"] }
 pydantic-settings = "2.15.0"
+more-itertools = "11.1.0"
 # Security & Authentication
 pwdlib = { version = "0.3.1", extras = ["argon2"] }
 pyjwt = "2.15.1"
