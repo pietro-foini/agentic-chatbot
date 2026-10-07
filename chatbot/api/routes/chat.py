@@ -32,6 +32,7 @@ from chatbot.graphs.config import ALL_TOOLS, DEFAULT_USER_PREFERENCES
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
 from chatbot.llm.config import MODELS
+from chatbot.log import logger
 from chatbot.services.attachment import save_attachment
 from chatbot.services.chat import (
     build_human_message,
@@ -70,17 +71,17 @@ async def delete_chats(
     threads = (await session.execute(query)).scalars().all()
 
     # TODO: optimize for a production scenario with many threads per user or add limit to chat threads.
+    # Delete all the thread information from graph checkpointer saver.
+    for thread in threads:
+        await checkpointer.adelete_thread(str(thread))
+        # Delete all the thread information from graph store artifacts.
+        items = await store.asearch(("artifacts", str(thread)), limit=1000)
+        for item in items:
+            await store.adelete(item.namespace, item.key)
+
     if threads:
         # Delete threads from main dataset.
         await session.execute(delete(ThreadModel).where(ThreadModel.user_id == current_user.id))
-
-        # Delete all the thread information from graph checkpointer saver.
-        for thread in threads:
-            await checkpointer.adelete_thread(str(thread))
-            # Delete all the thread information from graph store artifacts.
-            items = await store.asearch(("artifacts", str(thread)), limit=1000)
-            for item in items:
-                await store.adelete(item.namespace, item.key)
 
     return Response(status_code=204, headers={"HX-Redirect": "/"})
 
@@ -130,7 +131,7 @@ async def process_chat(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
-    vector_store: PGVectorStore = Depends(get_vector_store),
+    vector_store: Annotated[PGVectorStore, Depends(get_vector_store)],
     message: str | None = Form(None, max_length=500),
     file: UploadFile | None = File(None),
     approved: str | None = Form(None),
@@ -184,12 +185,14 @@ async def process_chat(
     try:
         response = await graph.ainvoke(graph_input, stream_mode="values", config=config, context=context)
     except ServerError:
+        logger.exception("LLM provider unavailable (thread=%s)", thread_id)
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
             context={"error": "The AI service is temporarily unavailable. Please try again in a moment."},
         )
     except (GraphRecursionError, ChatGoogleGenerativeAIError):
+        logger.exception("Graph execution failed (thread=%s)", thread_id)
         return templates.TemplateResponse(
             request=request,
             name="partials/error_message.html",
