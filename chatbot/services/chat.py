@@ -26,7 +26,7 @@ def build_human_message(user: UserModel, text: str, attachment: Attachment | Non
     additional_kwargs: dict = {}
 
     if attachment:
-        content.append({"type": "media", "mime_type": attachment.type, "file_uri": attachment.file_uri})
+        content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
         additional_kwargs["file_metadata"] = {"id": attachment.id, "size": attachment.size}
 
     return HumanMessage(
