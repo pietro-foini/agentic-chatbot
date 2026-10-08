@@ -27,8 +27,5 @@ COPY scripts/ ./scripts/
 # Add the virtual environment to PATH.
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose FastAPI backend port.
-EXPOSE 8000
-
 # Run Uvicorn directly as the primary process.
-CMD ["sh", "-c", "python -m scripts.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python -m scripts.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
