@@ -13,7 +13,7 @@ import seaborn as sns
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
-from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.db.backends.postgres import PostgresAsyncHandler
 from chatbot.graphs.security import validate_plot_code
 from chatbot.graphs.state import Context
 from chatbot.schemas.tools import (

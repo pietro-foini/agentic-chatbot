@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from chatbot.api.routes import auth_router, chat_router
-from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.db.backends.postgres import PostgresAsyncHandler
 from chatbot.embeddings.config import embeddings
 from chatbot.errors import AuthenticationRequiredError, FormRegisterException, UserFacingError
 from chatbot.graphs.v1.agent import build_agent

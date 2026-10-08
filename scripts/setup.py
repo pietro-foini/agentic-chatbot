@@ -5,7 +5,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
 
-from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.db.backends.postgres import PostgresAsyncHandler
 from chatbot.settings import S
 
 
