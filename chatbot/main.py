@@ -14,7 +14,7 @@ from chatbot.api.routes import auth_router, chat_router
 from chatbot.db.backends.postgres import PostgresAsyncHandler
 from chatbot.embeddings.config import embeddings
 from chatbot.errors import AuthenticationRequiredError, FormRegisterException, UserFacingError
-from chatbot.graphs.v1.agent import build_agent
+from chatbot.graphs.v2.agent import build_agent
 from chatbot.settings import S
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
