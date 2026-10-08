@@ -1,12 +1,14 @@
-from typing import Literal
+from typing import Literal, Self
 from urllib.parse import quote_plus
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Store here environment variables"""
+
+    ENVIRONMENT: Literal["local", "cloud"] = Field(description="Where the app is running")
 
     # Authentication.
     SECRET_KEY: SecretStr = Field(min_length=32, description="The secret key for the authentication")
@@ -18,6 +20,7 @@ class Settings(BaseSettings):
 
     # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
+    REGION: str = Field(description="The region of the Google Cloud Platform project")
 
     # Google Cloud Storage.
     GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
@@ -47,9 +50,13 @@ class Settings(BaseSettings):
     # Database PostgreSQL.
     DB_USER: str = Field(description="The user of the PostgreSQL database")
     DB_PASSWORD: SecretStr = Field(description="The password of the PostgreSQL database")
-    DB_HOST: str = Field(description="The host of the PostgreSQL database")
-    DB_PORT: int = Field(description="The port of the PostgreSQL database")
     DB_NAME: str = Field(description="The PostgreSQL database name")
+    # Local.
+    DB_HOST: str | None = Field(default=None, description="The host of the PostgreSQL database")
+    DB_PORT: int | None = Field(default=None, description="The port of the PostgreSQL database")
+    # Cloud.
+    INSTANCE_NAME: str | None = Field(default=None, description="Cloud SQL instance name")
+
     TABLE_NAME_VECTORS: str = Field(
         default="vectors",
         description="Database table used to store vector embeddings for similarity search",
@@ -96,21 +103,33 @@ class Settings(BaseSettings):
         description="Allowed mime types for attachment",
     )
 
+    @model_validator(mode="after")
+    def _check_db_config(self) -> Self:
+        """Checks that the database config is valid"""
+
+        if self.ENVIRONMENT == "cloud" and not self.INSTANCE_NAME:
+            raise ValueError("INSTANCE_NAME is required when ENVIRONMENT=cloud")
+        if self.ENVIRONMENT == "local" and not self.DB_HOST and not self.DB_PORT:
+            raise ValueError("DB_HOST and DB_PORT are required when ENVIRONMENT=local")
+        return self
+
     @property
     def postgres_uri(self) -> str:
         """URI for standard PostgreSQL drivers (psycopg / psycopg_pool)"""
-        return (
-            f"postgresql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+
+        pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
+        if self.ENVIRONMENT == "cloud":
+            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+        return f"postgresql://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     @property
     def asyncpg_uri(self) -> str:
         """URI for SQLAlchemy + asyncpg driver"""
-        return (
-            f"postgresql+asyncpg://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+
+        pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
+        if self.ENVIRONMENT == "cloud":
+            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+        return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 S = Settings()  # type: ignore[call-arg]
