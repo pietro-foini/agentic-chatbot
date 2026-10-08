@@ -8,15 +8,12 @@ from psycopg_pool import AsyncConnectionPool
 from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.settings import S
 
-DB_URI = f"postgresql://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{S.DB_NAME}"
-DB_URI_2 = f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{S.DB_NAME}"
-
 
 async def init_database() -> None:
     """Initialize relational, checkpoint, store, and vector database schemas"""
 
     db = PostgresAsyncHandler(
-        db_uri=DB_URI_2,
+        db_uri=S.postgres_uri,
         readonly=False,
         statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
     )
@@ -26,7 +23,7 @@ async def init_database() -> None:
         await db.init_db()
 
         async with AsyncConnectionPool(
-            conninfo=DB_URI,
+            conninfo=S.asyncpg_uri,
             kwargs={"autocommit": True},
         ) as pool:
             await pool.open()
