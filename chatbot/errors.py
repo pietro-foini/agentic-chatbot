@@ -14,3 +14,9 @@ class FormRegisterException(Exception):
     """Raise error when the register form validation fails"""
 
     pass
+
+
+class FormLoginException(Exception):
+    """Raise error when the login form validation fails"""
+
+    pass

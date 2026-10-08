@@ -1,17 +1,17 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chatbot.api.dependencies import get_register_form, get_session
+from chatbot.api.dependencies import get_login_form, get_register_form, get_session
 from chatbot.db.models import UserModel
-from chatbot.errors import FormRegisterException
-from chatbot.schemas.auth import RegisterForm
+from chatbot.errors import FormLoginException, FormRegisterException
+from chatbot.schemas.auth import LoginForm, RegisterForm
 from chatbot.services.security import create_access_token, get_password_hash, verify_password
 from chatbot.settings import S
 
@@ -34,6 +34,7 @@ async def register_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="register.html")
 
 
+# TODO: add rate limiter on how many registration can be done
 @auth_router.post(path="/register")
 async def register_form_submit(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -43,7 +44,7 @@ async def register_form_submit(
 
     # Check if the user has been already registered.
     query = select(UserModel).where(or_(UserModel.username == form.username, UserModel.email == form.email))
-    user = (await session.execute(query)).scalar_one_or_none()
+    user = (await session.execute(query)).scalar()
     if user:
         raise FormRegisterException("Username or email already exists.")
 
@@ -65,24 +66,18 @@ async def register_form_submit(
     return RedirectResponse(url="/login", status_code=303)
 
 
+# TODO: add rate limiter on how many login can be done
 @auth_router.post(path="/login")
 async def login_form_submit(
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    username: Annotated[str, Form(min_length=5, max_length=50)],
-    password: Annotated[str, Form(min_length=8, max_length=128)],
+    form: Annotated[LoginForm, Depends(get_login_form)],
 ) -> Response:
     """Process login form submissions and redirect to main page"""
 
-    query = select(UserModel).where(UserModel.username == username)
+    query = select(UserModel).where(UserModel.username == form.username)
     user = (await session.execute(query)).scalar_one_or_none()
-    if not user or not verify_password(password, user.hashed_password):
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={"error": "Incorrect username or password."},
-            status_code=400,
-        )
+    if not user or not verify_password(form.password, user.hashed_password):
+        raise FormLoginException("Incorrect username or password.")
 
     # Create access token.
     access_token = create_access_token(data={"sub": str(user.id)})

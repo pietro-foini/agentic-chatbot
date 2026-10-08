@@ -1,6 +1,13 @@
 from pydantic import BaseModel, EmailStr, Field
 
 
+class LoginForm(BaseModel):
+    """Login form"""
+
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class RegisterForm(BaseModel):
     """Register form"""
 

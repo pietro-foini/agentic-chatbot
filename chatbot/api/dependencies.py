@@ -14,8 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.db.models import ThreadModel, UserModel
-from chatbot.errors import AuthenticationRequiredError, FormRegisterException
-from chatbot.schemas.auth import RegisterForm
+from chatbot.errors import AuthenticationRequiredError, FormLoginException, FormRegisterException
+from chatbot.schemas.auth import LoginForm, RegisterForm
 from chatbot.settings import S
 
 
@@ -72,6 +72,16 @@ async def get_register_form(request: Request) -> RegisterForm:
         return RegisterForm.model_validate(form_data)
     except ValidationError:
         raise FormRegisterException("Something went wrong in the form.")
+
+
+async def get_login_form(request: Request) -> LoginForm:
+    """Validate the login form object model used during the authentication in order to raise custom error"""
+
+    form_data = await request.form()
+    try:
+        return LoginForm.model_validate(form_data)
+    except ValidationError:
+        raise FormLoginException("Something went wrong in the form.")
 
 
 async def get_current_user(
