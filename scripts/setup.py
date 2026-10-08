@@ -13,7 +13,7 @@ async def init_database() -> None:
     """Initialize relational, checkpoint, store, and vector database schemas"""
 
     db = PostgresAsyncHandler(
-        db_uri=S.postgres_uri,
+        db_uri=S.asyncpg_uri,
         readonly=False,
         statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
     )
@@ -23,13 +23,9 @@ async def init_database() -> None:
         await db.init_db()
 
         async with AsyncConnectionPool(
-            conninfo=S.asyncpg_uri,
+            conninfo=S.postgres_uri,
             kwargs={"autocommit": True},
         ) as pool:
-            await pool.open()
-
-            async with pool.connection() as conn:
-                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
             checkpointer = AsyncPostgresSaver(pool)
             await checkpointer.setup()
