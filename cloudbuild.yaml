@@ -16,7 +16,7 @@ steps:
   args:
     - -c
     - |
-      docker push $_REGION-docker.pkg.dev/$_PROJECT_ID/$REPO_NAME-server:latest
+      docker push $_REGION-docker.pkg.dev/$_PROJECT_ID/servers/$REPO_NAME-server:latest
 # Deploy container image to Cloud Run.
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'deploy-cloud-run'
