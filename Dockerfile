@@ -27,4 +27,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000
 
 # Run Uvicorn directly as the primary process.
-CMD ["uvicorn", "chatbot.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -m chatbot.db.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port 8000"]

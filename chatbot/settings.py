@@ -103,5 +103,21 @@ class Settings(BaseSettings):
         description="Allowed mime types for attachment",
     )
 
+    @property
+    def postgres_uri(self) -> str:
+        """URI for standard PostgreSQL drivers (psycopg / psycopg_pool)"""
+        return (
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    @property
+    def asyncpg_uri(self) -> str:
+        """URI for SQLAlchemy + asyncpg driver"""
+        return (
+            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
 
 S = Settings()  # type: ignore[call-arg]

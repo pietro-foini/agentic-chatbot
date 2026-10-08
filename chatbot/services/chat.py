@@ -1,10 +1,10 @@
 import uuid
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langgraph.store.postgres.base import BasePostgresStore
 from langgraph.types import Command
 from more_itertools import split_before
 
-from chatbot.db.config import store
 from chatbot.db.models import UserModel
 from chatbot.schemas.chat import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
@@ -48,12 +48,15 @@ def build_resume_command(approved: str, reason: str | None) -> Command:
     return Command(resume={"decisions": decisions})
 
 
-async def parse_messages(thread_id: str, messages: list[BaseMessage]) -> list[UserResponse | AssistantResponse]:
+async def parse_messages(
+    thread_id: str, messages: list[BaseMessage], store: BasePostgresStore
+) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
 
     :param messages: the input conversation messages
     :param thread_id: the ID of the thread
+    :param store: the store
     :return: the parsed conversation messages
     """
 
@@ -61,7 +64,7 @@ async def parse_messages(thread_id: str, messages: list[BaseMessage]) -> list[Us
 
     for group in split_before(messages, lambda m: isinstance(m, HumanMessage)):
         user_response = await extract_user_response(thread_id, group)
-        bot_response = await extract_assistant_response(thread_id, group)
+        bot_response = await extract_assistant_response(thread_id, group, store)
         parsed_messages.extend((user_response, bot_response))
 
     return parsed_messages
@@ -115,12 +118,15 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
     return response
 
 
-async def extract_assistant_response(thread_id: str, messages: list[BaseMessage]) -> AssistantResponse:
+async def extract_assistant_response(
+    thread_id: str, messages: list[BaseMessage], store: BasePostgresStore
+) -> AssistantResponse:
     """
     Extract the assistant response.
 
     :param messages: the input conversation messages
     :param thread_id: the ID of the thread
+    :param store: the store
     :return: the assistant response
     """
 

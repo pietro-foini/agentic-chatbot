@@ -13,6 +13,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
+from langgraph.store.postgres.base import BasePostgresStore
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,6 +94,7 @@ async def get_chat(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
+    store: Annotated[BasePostgresStore, Depends(get_store)],
 ):
     """Retrieve the chat history for the given ID thread and the current user"""
 
@@ -103,7 +105,7 @@ async def get_chat(
     # Retrieve chat data.
     messages = values.get("messages", [])
     total_cost = values.get("total_cost", 0)
-    parsed_messages = await parse_messages(str(thread_id), messages)
+    parsed_messages = await parse_messages(str(thread_id), messages, store)
 
     # Retrieve the list of all the threads of the current user.
     query = select(ThreadModel.thread_id).where(ThreadModel.user_id == current_user.id)
@@ -132,6 +134,7 @@ async def process_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
     vector_store: Annotated[PGVectorStore, Depends(get_vector_store)],
+    store: Annotated[BasePostgresStore, Depends(get_store)],
     message: str | None = Form(None, max_length=500),
     file: UploadFile | None = File(None),
     approved: str | None = Form(None),
@@ -199,7 +202,7 @@ async def process_chat(
 
     # Get assistant message.
     current_messages = get_last_turn_messages(response["messages"])
-    assistant_message = await extract_assistant_response(str(thread_id), current_messages)
+    assistant_message = await extract_assistant_response(str(thread_id), current_messages, store)
     # Get total cost.
     total_cost = state_snapshot.values.get("total_cost", 0)
 

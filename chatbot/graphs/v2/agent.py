@@ -15,10 +15,11 @@ from langchain.agents.middleware import (
     wrap_tool_call,
 )
 from langchain_core.messages import ToolMessage
+from langgraph.checkpoint.postgres.base import BasePostgresSaver
 from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.store.postgres.base import BasePostgresStore
 from langgraph.types import Command
 
-from chatbot.db.config import checkpointer, store
 from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.utils import extract_model_name
@@ -119,26 +120,31 @@ async def track_tool_metrics(
 
 
 # Create the graph instance.
-# noinspection PyTypeChecker
-LangGraphAgent = create_agent(
-    model=MODELS[S.MODEL_NAME],
-    tools=ALL_TOOLS,
-    state_schema=State,
-    context_schema=Context,
-    checkpointer=checkpointer,
-    store=store,
-    middleware=[
-        inject_dynamic_prompt,
-        inject_dynamic_model,
-        track_model_metrics,
-        track_tool_metrics,
-        ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
-        ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
-    ]
-    + [
-        HumanInTheLoopMiddleware(
-            interrupt_on={tool: InterruptOnConfig(allowed_decisions=["approve", "reject"]) for tool in SENSITIVE_TOOLS}
-        ),
-    ],
-    name=S.CHATBOT_NAME,
-)
+def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
+    """Construct an agent instance"""
+
+    # noinspection PyTypeChecker
+    return create_agent(
+        model=MODELS[S.MODEL_NAME],
+        tools=ALL_TOOLS,
+        state_schema=State,
+        context_schema=Context,
+        checkpointer=checkpointer,
+        store=store,
+        middleware=[
+            inject_dynamic_prompt,
+            inject_dynamic_model,
+            track_model_metrics,
+            track_tool_metrics,
+            ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
+            ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
+        ]
+        + [
+            HumanInTheLoopMiddleware(
+                interrupt_on={
+                    tool: InterruptOnConfig(allowed_decisions=["approve", "reject"]) for tool in SENSITIVE_TOOLS
+                }
+            ),
+        ],
+        name=S.CHATBOT_NAME,
+    )

@@ -10,8 +10,9 @@ from langchain.agents.middleware import (
 )
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
+from langgraph.checkpoint.postgres import BasePostgresSaver
+from langgraph.store.postgres.base import BasePostgresStore
 
-from chatbot.db.config import checkpointer, store
 from chatbot.graphs.prompts import SUPERVISOR_PROMPT
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v3.subagents import agent_1, agent_2, agent_3, agent_4
@@ -80,22 +81,26 @@ async def dynamic_model(
     return await handler(request.override(model=request.runtime.context.model))
 
 
-# noinspection PyTypeChecker
-LangGraphAgent = create_agent(
-    model=MODELS[S.MODEL_NAME],
-    tools=SUPERVISOR_TOOLS,
-    state_schema=State,
-    context_schema=Context,
-    checkpointer=checkpointer,
-    store=store,
-    system_prompt=SUPERVISOR_PROMPT.format(
-        user_name="Pietro",
-        bot_name=S.CHATBOT_NAME,
-    ),
-    middleware=[
-        dynamic_model,
-        ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
-        ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
-    ],
-    name="supervisor_agent",
-)
+# Create the graph instance.
+def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
+    """Construct an agent instance"""
+
+    # noinspection PyTypeChecker
+    return create_agent(
+        model=MODELS[S.MODEL_NAME],
+        tools=SUPERVISOR_TOOLS,
+        state_schema=State,
+        context_schema=Context,
+        checkpointer=checkpointer,
+        store=store,
+        system_prompt=SUPERVISOR_PROMPT.format(
+            user_name="Pietro",
+            bot_name=S.CHATBOT_NAME,
+        ),
+        middleware=[
+            dynamic_model,
+            ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
+            ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
+        ],
+        name="supervisor_agent",
+    )
