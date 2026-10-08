@@ -1,3 +1,6 @@
+from typing import Literal
+from urllib.parse import quote_plus
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,8 +16,10 @@ class Settings(BaseSettings):
     )
 
     # Authentication.
-    SECRET_KEY: str = Field(description="The secret key for the authentication")
-    ALGORITHM: str = Field(default="HS256", description="The algorithm to use for authentication")
+    SECRET_KEY: SecretStr = Field(min_length=32, description="The secret key for the authentication")
+    ALGORITHM: Literal["HS256", "HS384", "HS512"] = Field(
+        default="HS256", description="The algorithm to use for authentication"
+    )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=60, description="The number of minutes after which the access token expires"
     )
@@ -60,7 +65,7 @@ class Settings(BaseSettings):
 
     # Assistant.
     CHATBOT_NAME: str = Field(default="Genius", description="The chatbot name")
-    TEMPERATURE: float | int = Field(default=0.9, description="Controls randomness in LLM responses")
+    TEMPERATURE: float = Field(ge=0, le=1, default=0.9, description="Controls randomness in LLM responses")
     MAX_TOKENS: int = Field(
         default=1000,
         description="Maximum number of tokens the LLM can generate per request",
@@ -74,10 +79,6 @@ class Settings(BaseSettings):
         description="Timeout for single LLM call",
     )
     MAX_ATTACHMENTS_SIZE: int = Field(default=1024, description="Maximum file size per attachment in kilobytes")
-    MINUTES_TEMPORARY_URL: int = Field(
-        default=720,
-        description="Duration (in minutes) a signed Cloud Storage URL remains valid",
-    )
     RECURSION_LIMIT: int = Field(
         default=25,
         description="Max recursive steps the agent can perform per request",
@@ -107,7 +108,7 @@ class Settings(BaseSettings):
     def postgres_uri(self) -> str:
         """URI for standard PostgreSQL drivers (psycopg / psycopg_pool)"""
         return (
-            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}"
+            f"postgresql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
@@ -115,7 +116,7 @@ class Settings(BaseSettings):
     def asyncpg_uri(self) -> str:
         """URI for SQLAlchemy + asyncpg driver"""
         return (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD.get_secret_value()}"
+            f"postgresql+asyncpg://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 

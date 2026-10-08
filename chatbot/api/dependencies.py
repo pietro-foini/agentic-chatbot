@@ -79,7 +79,7 @@ async def get_current_user(
         raise AuthenticationRequiredError()
 
     try:
-        payload = jwt.decode(token, S.SECRET_KEY, algorithms=[S.ALGORITHM])
+        payload = jwt.decode(token, S.SECRET_KEY.get_secret_value(), algorithms=[S.ALGORITHM])
         user_id = payload.get("sub")
         if user_id is None:
             raise AuthenticationRequiredError()
