@@ -1,27 +1,27 @@
+import operator
 from dataclasses import dataclass
+from typing import Annotated, Required, TypedDict
 
-from langchain.agents import AgentState
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage
 from langchain_core.tools import BaseTool
 from langchain_postgres import PGVectorStore
-
-__all__ = [
-    "State",
-    "Context",
-]
+from langgraph.graph import add_messages
 
 
-class State(AgentState):
+class State(TypedDict):
     """Agent state"""
 
-    pass
+    messages: Required[Annotated[list[BaseMessage], add_messages]]
+
+    total_cost: Annotated[float, operator.add]
 
 
 @dataclass
 class Context:
     """Context configuration for Agent runtime call"""
 
-    chatbot_name: str
+    thread_id: str
     system_prompt: str
     model: BaseChatModel
     tools: list[BaseTool]

@@ -1,39 +1,82 @@
 import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langgraph.store.postgres import AsyncPostgresStore
+from langgraph.types import Command
 from more_itertools import split_before
 
-from chatbot.data import Attachment, BotResponse, ThinkingStep, UserResponse
+from chatbot.db.models import UserModel
+from chatbot.schemas.chat import AssistantResponse, Attachment, ThinkingStep, UserResponse
 
 
-def parse_messages(messages: list[HumanMessage | ToolMessage | AIMessage]) -> list[UserResponse | BotResponse]:
+def get_last_turn_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
+    """Messages starting from the latest HumanMessage"""
+
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], HumanMessage):
+            return messages[i:]
+
+    return []
+
+
+def build_human_message(user: UserModel, text: str, attachment: Attachment | None) -> HumanMessage:
+    """Build a HumanMessage from the provided data"""
+
+    content: list[dict] = [{"type": "text", "text": text}]
+    additional_kwargs: dict = {}
+
+    if attachment:
+        content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
+        additional_kwargs["file_metadata"] = {"id": attachment.id, "size": attachment.size}
+
+    return HumanMessage(
+        id=str(uuid.uuid4()),
+        name=user.username or "user",
+        content=content,
+        additional_kwargs=additional_kwargs,
+    )
+
+
+def build_resume_command(approved: str, reason: str | None) -> Command:
+    """Build resume command"""
+
+    if approved.lower() == "true":
+        decisions = [{"type": "approve"}]
+    else:
+        decisions = [{"type": "reject", "message": reason or "Action rejected by user."}]
+
+    return Command(resume={"decisions": decisions})
+
+
+async def parse_messages(
+    thread_id: str, messages: list[BaseMessage], store: AsyncPostgresStore
+) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
+    :param thread_id: the ID of the thread
+    :param store: the store
     :return: the parsed conversation messages
-    :rtype: list[UserResponse | BotResponse]
     """
 
     parsed_messages = []
 
     for group in split_before(messages, lambda m: isinstance(m, HumanMessage)):
-        user_response = extract_user_response(group)
-        bot_response = extract_bot_response(group)
+        user_response = await extract_user_response(thread_id, group)
+        bot_response = await extract_assistant_response(thread_id, group, store)
         parsed_messages.extend((user_response, bot_response))
 
     return parsed_messages
 
 
-def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> UserResponse:
+async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> UserResponse:
     """
     Extract the user response.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
+    :param thread_id: the ID of the thread
     :return: the user response
-    :rtype: UserResponse
     """
 
     response = UserResponse(id=str(uuid.uuid4()), name="User", content="")
@@ -64,7 +107,7 @@ def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]
                             elif item_type in ("media", "image", "file"):
                                 attachment_data = Attachment(
                                     id=file_metadata["id"],
-                                    file_uri=item["file_uri"],
+                                    file_uri=item["file_id"],
                                     type=item["mime_type"],
                                     size=file_metadata["size"],
                                 )
@@ -75,17 +118,19 @@ def extract_user_response(messages: list[HumanMessage | ToolMessage | AIMessage]
     return response
 
 
-def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage]) -> BotResponse:
+async def extract_assistant_response(
+    thread_id: str, messages: list[BaseMessage], store: AsyncPostgresStore
+) -> AssistantResponse:
     """
-    Extract the bot response.
+    Extract the assistant response.
 
     :param messages: the input conversation messages
-    :type messages: list[HumanMessage | ToolMessage | AIMessage]
-    :return: the bot response
-    :rtype: BotResponse
+    :param thread_id: the ID of the thread
+    :param store: the store
+    :return: the assistant response
     """
 
-    response = BotResponse(id=str(uuid.uuid4()), name="AI Assistant", content="")
+    response = AssistantResponse(id=str(uuid.uuid4()), name="AI Assistant", content="")
 
     is_tool_used = any(isinstance(msg, ToolMessage) for msg in messages)
 
@@ -93,12 +138,15 @@ def extract_bot_response(messages: list[HumanMessage | ToolMessage | AIMessage])
         if isinstance(msg, ToolMessage):
             elapsed = msg.response_metadata.get("elapsed_time", 0)
             response.thinking.append(ThinkingStep(step_name=f"Tool Response ({elapsed}s)", details=str(msg.content)))
-            if msg.artifact and msg.artifact.get("type") == "image":
-                response.image.append(msg.artifact["base64"])
-            if msg.artifact and msg.artifact.get("type") == "table":
-                response.table = msg.artifact["base64"]
-            if msg.artifact and msg.artifact.get("type") == "pdf":
-                response.pdf = msg.artifact["base64"]
+            if msg.artifact and msg.artifact.get("mime_type") == "image/png":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["file_id"])
+                response.image = item.value["data"]
+            if msg.artifact and msg.artifact.get("mime_type") == "text/csv":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["table_name"])
+                response.table = item.value["data"]
+            if msg.artifact and msg.artifact.get("mime_type") == "application/pdf":
+                item = await store.aget(namespace=("artifacts", thread_id), key=msg.artifact["file_id"])
+                response.pdf = item.value["data"]
 
         elif isinstance(msg, AIMessage):
             if msg.id:
