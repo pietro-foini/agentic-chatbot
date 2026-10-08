@@ -2,13 +2,14 @@ FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
+# Install Poetry.
+RUN pip install --no-cache-dir poetry==2.5.1
+
 # Copy dependency files.
-COPY requirements.txt pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock* ./
 
 # Configure poetry to create the virtual environment in the project root (.venv).
-RUN pip install --no-cache-dir -r requirements.txt
-RUN poetry config virtualenvs.in-project true \
-    && poetry install --only main --no-root
+RUN poetry config virtualenvs.in-project true && poetry install --only main --no-root
 
 FROM python:3.14-slim AS runner
 
@@ -20,6 +21,9 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application source code.
 COPY chatbot/ ./chatbot/
 
+# Copy scripts.
+COPY scripts/ ./scripts/
+
 # Add the virtual environment to PATH.
 ENV PATH="/app/.venv/bin:$PATH"
 
@@ -27,4 +31,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000
 
 # Run Uvicorn directly as the primary process.
-CMD ["sh", "-c", "python -m chatbot.db.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python -m scripts.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port 8000"]

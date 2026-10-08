@@ -1,6 +1,6 @@
 import uuid
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -13,7 +13,6 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
-from langgraph.store.postgres.base import BasePostgresStore
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,7 +94,7 @@ async def get_chat(
     current_user: Annotated[UserModel, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
-    store: Annotated[BasePostgresStore, Depends(get_store)],
+    store: Annotated[AsyncPostgresStore, Depends(get_store)],
 ):
     """Retrieve the chat history for the given ID thread and the current user"""
 
@@ -127,6 +126,7 @@ async def get_chat(
     )
 
 
+# TODO: add rate limiter on how many times can be done
 @chat_router.post(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def process_chat(
     request: Request,
@@ -135,11 +135,11 @@ async def process_chat(
     session: Annotated[AsyncSession, Depends(get_session)],
     graph: Annotated[CompiledStateGraph, Depends(get_graph)],
     vector_store: Annotated[PGVectorStore, Depends(get_vector_store)],
-    store: Annotated[BasePostgresStore, Depends(get_store)],
+    store: Annotated[AsyncPostgresStore, Depends(get_store)],
     message: str | None = Form(None, max_length=500),
     file: UploadFile | None = File(None),
-    approved: str | None = Form(None),
-    reason: str | None = Form(None),
+    approved: Annotated[Literal["true", "false"] | None, Form()] = None,
+    reason: Annotated[str | None, Form(max_length=500)] = None,
     model_name: str | None = Form(None),
 ):
     """Post a user message to assistant conversation to the chat history for the given ID thread"""

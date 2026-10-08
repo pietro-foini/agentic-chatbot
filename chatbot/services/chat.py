@@ -1,7 +1,7 @@
 import uuid
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-from langgraph.store.postgres.base import BasePostgresStore
+from langgraph.store.postgres import AsyncPostgresStore
 from langgraph.types import Command
 from more_itertools import split_before
 
@@ -49,7 +49,7 @@ def build_resume_command(approved: str, reason: str | None) -> Command:
 
 
 async def parse_messages(
-    thread_id: str, messages: list[BaseMessage], store: BasePostgresStore
+    thread_id: str, messages: list[BaseMessage], store: AsyncPostgresStore
 ) -> list[UserResponse | AssistantResponse]:
     """
     Parse the conversation sequence.
@@ -119,7 +119,7 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
 
 
 async def extract_assistant_response(
-    thread_id: str, messages: list[BaseMessage], store: BasePostgresStore
+    thread_id: str, messages: list[BaseMessage], store: AsyncPostgresStore
 ) -> AssistantResponse:
     """
     Extract the assistant response.
