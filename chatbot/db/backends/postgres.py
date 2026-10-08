@@ -3,19 +3,13 @@ from typing import Any, Mapping
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from chatbot.db.domain import DBInterface
 from chatbot.db.models import Base
 
 
-class PostgresAsyncHandler(DBInterface):
-    """PostgreSQL async implementation using SQLAlchemy and asyncpg"""
+class PostgresAsyncHandler:
+    """PostgreSQL async handler implementation"""
 
-    def __init__(
-        self,
-        db_uri: str,
-        readonly: bool = True,
-        statement_timeout_ms: int = 30000,
-    ) -> None:
+    def __init__(self, db_uri: str, readonly: bool = True, statement_timeout_ms: int = 30000) -> None:
         """Initialize a PostgreSQL async handler"""
 
         server_settings: dict[str, str] = {
@@ -59,5 +53,5 @@ class PostgresAsyncHandler(DBInterface):
         async with self.engine.connect() as conn:
             result = await conn.execute(text(query), params or {})
             if result.returns_rows:
-                return [dict(row._mapping) for row in result.fetchall()]
+                return [{str(k): v for k, v in row._mapping.items()} for row in result.fetchall()]
             return []
