@@ -119,7 +119,7 @@ class Settings(BaseSettings):
 
         pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
         if self.ENVIRONMENT == "cloud":
-            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.PROJECT_ID}:{self.REGION}:{self.INSTANCE_NAME}"
         return f"postgresql://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     @property
@@ -128,7 +128,7 @@ class Settings(BaseSettings):
 
         pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
         if self.ENVIRONMENT == "cloud":
-            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.PROJECT_ID}:{self.REGION}:{self.INSTANCE_NAME}"
         return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
