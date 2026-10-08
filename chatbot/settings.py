@@ -2,18 +2,11 @@ from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Store here environment variables"""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",
-    )
 
     # Authentication.
     SECRET_KEY: SecretStr = Field(min_length=32, description="The secret key for the authentication")
