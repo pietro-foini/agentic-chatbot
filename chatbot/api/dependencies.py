@@ -5,10 +5,10 @@ from typing import Annotated
 import jwt
 from fastapi import Cookie, Depends, HTTPException, Request
 from jwt.exceptions import InvalidTokenError
-from langchain_postgres import PGVectorStore
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langchain_core.vectorstores import VectorStore
+from langgraph.checkpoint.postgres.base import BasePostgresSaver
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.store.postgres import AsyncPostgresStore
+from langgraph.store.postgres.base import BasePostgresStore
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,38 +20,24 @@ from chatbot.settings import S
 
 
 def get_graph(request: Request) -> CompiledStateGraph:
-    """Return the compiled graph"""
+    """Return the compiled graph from request object initialized during startup"""
 
     return request.app.state.graph
 
 
-async def get_owned_thread(
-    thread_id: uuid.UUID,
-    current_user: Annotated[UserModel, Depends(get_current_user)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-) -> uuid.UUID:
-    """Ensure the thread is either new or belongs to the current user"""
-
-    owner = await session.scalar(select(ThreadModel.user_id).where(ThreadModel.thread_id == thread_id))
-    if owner is not None and owner != current_user.id:
-        raise HTTPException(status_code=404, detail="Chat not found.")
-
-    return thread_id
-
-
-def get_vector_store(request: Request) -> PGVectorStore:
-    """Get PGVectorStore instance from request object initialized during startup"""
+def get_vector_store(request: Request) -> VectorStore:
+    """Get vector store instance from request object initialized during startup"""
 
     return request.app.state.vector_store
 
 
-def get_checkpointer(request: Request) -> AsyncPostgresSaver:
+def get_checkpointer(request: Request) -> BasePostgresSaver:
     """Get checkpointer instance from request object initialized during startup"""
 
     return request.app.state.checkpointer
 
 
-def get_store(request: Request) -> AsyncPostgresStore:
+def get_store(request: Request) -> BasePostgresStore:
     """Get store instance from request object initialized during startup"""
 
     return request.app.state.store
@@ -71,7 +57,7 @@ async def get_register_form(request: Request) -> RegisterForm:
     try:
         return RegisterForm.model_validate(form_data)
     except ValidationError:
-        raise FormRegisterException("Something went wrong in the form.")
+        raise FormRegisterException("Please check the data you entered.")
 
 
 async def get_login_form(request: Request) -> LoginForm:
@@ -81,7 +67,7 @@ async def get_login_form(request: Request) -> LoginForm:
     try:
         return LoginForm.model_validate(form_data)
     except ValidationError:
-        raise FormLoginException("Something went wrong in the form.")
+        raise FormLoginException("Please check the data you entered.")
 
 
 async def get_current_user(
@@ -90,25 +76,35 @@ async def get_current_user(
 ) -> UserModel:
     """Authenticate API requests based on token returning the active user or redirect to login page"""
 
-    token = token_cookie
-
-    if not token:
+    if not token_cookie:
         raise AuthenticationRequiredError()
 
     try:
-        payload = jwt.decode(token, S.SECRET_KEY.get_secret_value(), algorithms=[S.ALGORITHM])
+        payload = jwt.decode(
+            token_cookie, S.SECRET_KEY.get_secret_value(), algorithms=[S.ALGORITHM], options={"require": ["exp", "sub"]}
+        )
         user_id = payload.get("sub")
-        if user_id is None:
-            raise AuthenticationRequiredError()
     except InvalidTokenError:
         raise AuthenticationRequiredError()
 
     # Retrieve the current user if it is not disabled.
     query = select(UserModel).where(UserModel.id == user_id, UserModel.is_active.is_(True))
-    result = await session.execute(query)
-
-    current_user = result.scalar_one_or_none()
-    if not current_user:
+    user = (await session.execute(query)).scalar_one_or_none()
+    if not user:
         raise AuthenticationRequiredError()
 
-    return current_user
+    return user
+
+
+async def get_owned_thread(
+    thread_id: uuid.UUID,
+    current_user: Annotated[UserModel, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> uuid.UUID:
+    """Ensure the thread is either new or belongs to the current user"""
+
+    owner = await session.scalar(select(ThreadModel.user_id).where(ThreadModel.thread_id == thread_id))
+    if owner is not None and owner != current_user.id:
+        raise HTTPException(status_code=404, detail="Chat not found.")
+
+    return thread_id

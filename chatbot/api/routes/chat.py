@@ -83,6 +83,7 @@ async def delete_chats(
     if threads:
         # Delete threads from main dataset.
         await session.execute(delete(ThreadModel).where(ThreadModel.user_id == current_user.id))
+        await session.commit()
 
     return Response(status_code=204, headers={"HX-Redirect": "/"})
 
@@ -161,10 +162,9 @@ async def process_chat(
             .on_conflict_do_nothing(index_elements=[ThreadModel.thread_id])
         )
         await session.execute(stmt)
+        await session.commit()
     else:
         return Response(status_code=204)
-
-    await session.commit()
 
     # Define the graph setting.
     config = RunnableConfig(
