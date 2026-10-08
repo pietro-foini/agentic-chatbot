@@ -9,11 +9,13 @@ from langchain_postgres import PGVectorStore
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.postgres import AsyncPostgresStore
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.db.models import ThreadModel, UserModel
-from chatbot.errors import AuthenticationRequiredError
+from chatbot.errors import AuthenticationRequiredError, FormRegisterException
+from chatbot.schemas.auth import RegisterForm
 from chatbot.settings import S
 
 
@@ -59,12 +61,17 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session per request lifecycle"""
 
     async with request.app.state.db.session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+        yield session
+
+
+async def get_register_form(request: Request) -> RegisterForm:
+    """Validate the register form object model used during the authentication in order to raise custom error"""
+
+    form_data = await request.form()
+    try:
+        return RegisterForm.model_validate(form_data)
+    except ValidationError:
+        raise FormRegisterException("Something went wrong in the form.")
 
 
 async def get_current_user(

@@ -17,12 +17,11 @@ class Settings(BaseSettings):
 
     # Authentication.
     SECRET_KEY: SecretStr = Field(min_length=32, description="The secret key for the authentication")
-    ALGORITHM: Literal["HS256", "HS384", "HS512"] = Field(
-        default="HS256", description="The algorithm to use for authentication"
-    )
+    ALGORITHM: Literal["HS256"] = Field(default="HS256", description="The algorithm to use for authentication")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=60, description="The number of minutes after which the access token expires"
     )
+    COOKIE_SECURE: bool = Field(description="Enable secure cookies; disable only for local development")
 
     # Google Cloud Platform setting.
     PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")

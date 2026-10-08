@@ -13,7 +13,7 @@ from psycopg_pool import AsyncConnectionPool
 from chatbot.api.routes import auth_router, chat_router
 from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.embeddings.config import embeddings
-from chatbot.errors import AuthenticationRequiredError, UserFacingError
+from chatbot.errors import AuthenticationRequiredError, FormRegisterException, UserFacingError
 from chatbot.graphs.v1.agent import build_agent
 from chatbot.settings import S
 
@@ -37,7 +37,6 @@ async def lifespan(app: FastAPI):
         open=False,
         kwargs={"autocommit": True, "row_factory": dict_row},
     ) as pool:
-        await pool.open()
         await db.connect()
 
         try:
@@ -102,6 +101,18 @@ async def user_exception_handler(request: Request, exc: UserFacingError):
     return templates.TemplateResponse(
         request=request,
         name="partials/error_message.html",
+        context={"error": str(exc)},
+        status_code=200,
+    )
+
+
+@app.exception_handler(FormRegisterException)
+async def form_exception_handler(request: Request, exc: FormRegisterException):
+    """Handle the exception raised when the register form validation fails"""
+
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
         context={"error": str(exc)},
         status_code=200,
     )

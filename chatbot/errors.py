@@ -8,3 +8,9 @@ class AuthenticationRequiredError(Exception):
     """Raise error when user is not authenticated or token is not valid"""
 
     pass
+
+
+class FormRegisterException(Exception):
+    """Raise error when the register form validation fails"""
+
+    pass
