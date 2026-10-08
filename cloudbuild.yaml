@@ -35,7 +35,9 @@ steps:
           --max-instances=100 \
           --project $_PROJECT_ID \
           --add-cloudsql-instances $_PROJECT_ID:$_REGION:$_INSTANCE_NAME \
+          --set-env-vars ENVIRONMENT=$_ENVIRONMENT \
           --set-env-vars PROJECT_ID=$_PROJECT_ID \
+          --set-env-vars REGION=$_REGION \
           --set-env-vars GCS_PROCESSED_BUCKET=$_GCS_PROCESSED_BUCKET \
           --set-env-vars COOKIE_SECURE=$_COOKIE_SECURE \
           --set-env-vars DB_NAME=$_DB_NAME \
