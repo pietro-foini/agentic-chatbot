@@ -295,13 +295,13 @@ async def download_and_analyze_pdf_from_storage(
         content = [
             {
                 "type": "text",
-                "text": "The document has been successfully downloaded. However, direct PDF analysis inside tool messages is not supported on AWS; please upload it as an attachment to be analyzed.",
+                "text": "The document is stored in S3. Direct PDF analysis inside tool messages is not supported on AWS; I have automatically attached it as a document in the next message for analysis.",
             },
         ]
     else:
         raise ValueError(f"Unsupported cloud provider: {S.CLOUD_PROVIDER}")
 
-    artifact_data = {"file_id": file_id, "mime_type": "application/pdf"}
+    artifact_data = {"file_id": file_id, "mime_type": "application/pdf", "file_uri": file_uri}
 
     return content, artifact_data
 

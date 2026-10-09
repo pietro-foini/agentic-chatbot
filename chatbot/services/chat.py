@@ -31,12 +31,13 @@ def build_human_message(user: UserModel, text: str, attachment: Attachment | Non
         if S.CLOUD_PROVIDER == CloudProvider.GCP:
             content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
         if S.CLOUD_PROVIDER == CloudProvider.AWS:
+            safe_id = attachment.id.replace("-", "")[:8]
             content.append(
                 {
                     "type": "document",
                     "document": {
                         "format": "pdf",
-                        "name": f"attachment_{attachment.id[:8]}",
+                        "name": f"attachment_{safe_id}",
                         "source": {"s3Location": {"uri": attachment.file_uri}},
                     },
                 }
