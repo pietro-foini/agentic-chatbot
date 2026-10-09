@@ -293,7 +293,7 @@ async def download_and_analyze_pdf_from_storage(
         content = [
             {"type": "text", "text": "Briefly describe the content of the file"},
             {
-                "type": "document",
+                "type": f"download_{file_id[:8]}",
                 "document": {"format": "pdf", "name": "download", "source": {"s3Location": {"uri": file_uri}}},
             },
         ]

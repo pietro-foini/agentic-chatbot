@@ -36,7 +36,7 @@ def build_human_message(user: UserModel, text: str, attachment: Attachment | Non
                     "type": "document",
                     "document": {
                         "format": "pdf",
-                        "name": "attachment",
+                        "name": f"attachment_{attachment.id[:8]}",
                         "source": {"s3Location": {"uri": attachment.file_uri}},
                     },
                 }
