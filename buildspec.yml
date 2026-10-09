@@ -11,14 +11,9 @@ phases:
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
   build:
     commands:
-      - echo Build started on `date`
-      - echo Building the Docker image...
       - docker build -t $ECR_REPO_URI:latest -f Dockerfile .
       - docker tag $ECR_REPO_URI:latest $ECR_REPO_URI:$IMAGE_TAG
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker images to ECR...
       - docker push $ECR_REPO_URI:latest
       - docker push $ECR_REPO_URI:$IMAGE_TAG
-      - echo Image pushed successfully!
