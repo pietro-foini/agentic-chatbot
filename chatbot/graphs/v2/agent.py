@@ -23,7 +23,7 @@ from langgraph.types import Command
 from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.utils import extract_model_name
-from chatbot.llm.config import MODELS
+from chatbot.llm.config import get_model
 from chatbot.llm.pricing import compute_cost
 from chatbot.settings import S
 
@@ -125,7 +125,7 @@ def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
 
     # noinspection PyTypeChecker
     return create_agent(
-        model=MODELS[S.MODEL_NAME],
+        model=get_model(),
         tools=ALL_TOOLS,
         state_schema=State,
         context_schema=Context,

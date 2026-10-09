@@ -31,7 +31,7 @@ from chatbot.errors import UserFacingError
 from chatbot.graphs.config import ALL_TOOLS, DEFAULT_USER_PREFERENCES
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.llm.config import MODELS
+from chatbot.llm.config import get_model
 from chatbot.log import logger
 from chatbot.services.attachment import save_attachment
 from chatbot.services.chat import (
@@ -118,8 +118,8 @@ async def get_chat(
             "messages": parsed_messages,
             "thread_id": str(thread_id),
             "threads": [str(thread) for thread in threads],
-            "models": list(MODELS),
-            "default_model": S.MODEL_NAME,
+            "models": S.all_models,
+            "default_model": S.LLM_MODEL,
             "total_cost": total_cost,
             "user": current_user,
         },
@@ -174,7 +174,7 @@ async def process_chat(
     )
     context = Context(
         thread_id=str(thread_id),
-        model=MODELS.get(model_name) or MODELS[S.MODEL_NAME],
+        model=get_model(model_name),
         system_prompt=SYSTEM_PROMPT.format(user_name=current_user.username, bot_name=S.CHATBOT_NAME),
         tools=ALL_TOOLS,
         vector_store=vector_store,

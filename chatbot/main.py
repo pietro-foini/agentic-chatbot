@@ -11,8 +11,8 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from chatbot.api.routes import auth_router, chat_router
-from chatbot.db.backends.postgres import PostgresAsyncHandler
-from chatbot.embeddings.config import embeddings
+from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.embeddings.config import get_embeddings
 from chatbot.errors import AuthenticationRequiredError, FormRegisterException, UserFacingError
 from chatbot.graphs.v2.agent import build_agent
 from chatbot.settings import S
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
             vector_store = await PGVectorStore.create(
                 engine=PGEngine.from_engine(engine=db.engine),
                 table_name=S.TABLE_NAME_VECTORS,
-                embedding_service=embeddings,
+                embedding_service=get_embeddings(S.EMBEDDINGS_MODEL),
                 metadata_columns=["source"],
             )
 

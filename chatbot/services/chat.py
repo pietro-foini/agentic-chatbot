@@ -7,6 +7,7 @@ from more_itertools import split_before
 
 from chatbot.db.models import UserModel
 from chatbot.schemas.chat import AssistantResponse, Attachment, ThinkingStep, UserResponse
+from chatbot.settings import CloudProvider, S
 
 
 def get_last_turn_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
@@ -26,8 +27,20 @@ def build_human_message(user: UserModel, text: str, attachment: Attachment | Non
     additional_kwargs: dict = {}
 
     if attachment:
-        content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
         additional_kwargs["file_metadata"] = {"id": attachment.id, "size": attachment.size}
+        if S.CLOUD_PROVIDER == CloudProvider.GCP:
+            content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
+        if S.CLOUD_PROVIDER == CloudProvider.AWS:
+            content.append(
+                {
+                    "type": "document",
+                    "document": {
+                        "format": "pdf",
+                        "name": "attachment",
+                        "source": {"s3Location": {"uri": attachment.file_uri}},
+                    },
+                }
+            )
 
     return HumanMessage(
         id=str(uuid.uuid4()),
