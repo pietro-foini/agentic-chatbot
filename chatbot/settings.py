@@ -1,4 +1,4 @@
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Literal, Self
 from urllib.parse import quote_plus
 
@@ -6,14 +6,14 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Environment to use"""
 
     LOCAL = "local"
     CLOUD = "cloud"
 
 
-class CloudProvider(str, Enum):
+class CloudProvider(StrEnum):
     """Cloud provider"""
 
     GCP = "gcp"
