@@ -289,12 +289,13 @@ async def download_and_analyze_pdf_from_storage(
             {"type": "text", "text": "Briefly describe the content of the file"},
             {"type": "file", "file_id": file_uri, "mime_type": "application/pdf"},
         ]
-    elif S.CLOUD_PROVIDER == CloudProvider.AWS:
+    elif (
+        S.CLOUD_PROVIDER == CloudProvider.AWS
+    ):  # Not all the models handle multi-modal format inside the ToolMessage (some models only into HumanMessage)
         content = [
-            {"type": "text", "text": "Briefly describe the content of the file"},
             {
-                "type": f"download_{file_id[:8]}",
-                "document": {"format": "pdf", "name": "download", "source": {"s3Location": {"uri": file_uri}}},
+                "type": "text",
+                "text": "The document has been successfully downloaded but it is not possible to analyze it.",
             },
         ]
     else:

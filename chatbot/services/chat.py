@@ -117,11 +117,18 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
                             item_type = item.get("type")
                             if item_type == "text" and isinstance(item.get("text"), str):
                                 text_parts.append(item["text"])
-                            elif item_type in ("media", "image", "file"):
+                            elif item_type == "file":  # GCP
                                 attachment_data = Attachment(
                                     id=file_metadata["id"],
                                     file_uri=item["file_id"],
                                     type=item["mime_type"],
+                                    size=file_metadata["size"],
+                                )
+                            elif item_type == "document":  # AWS
+                                attachment_data = Attachment(
+                                    id=file_metadata["id"],
+                                    file_uri=item["document"]["source"]["s3Location"]["uri"],
+                                    type=item["document"]["format"],
                                     size=file_metadata["size"],
                                 )
 
