@@ -295,7 +295,7 @@ async def download_and_analyze_pdf_from_storage(
         content = [
             {
                 "type": "text",
-                "text": "The document has been successfully downloaded but it is not possible to analyze it.",
+                "text": "The document has been successfully downloaded however direct PDF analysis inside tool messages is not supported on AWS.",
             },
         ]
     else:

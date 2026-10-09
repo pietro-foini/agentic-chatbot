@@ -181,19 +181,11 @@ async def extract_assistant_response(
             elif msg.content:
                 if isinstance(msg.content, str):
                     response.content = msg.content
-                elif isinstance(msg.content, list) and isinstance(msg.content[0], str):
-                    response.content = msg.content[0]
-                elif isinstance(msg.content, list) and isinstance(msg.content[0].get("text"), str):
-                    response.content = msg.content[0].get("text", "")
-                elif (
-                    isinstance(msg.content, list)
-                    and isinstance(msg.content[0].get("thinking"), str)
-                    and isinstance(msg.content[1].get("text"), str)
-                ):
-                    response.content = msg.content[1].get("text", "")
-                    response.thinking.append(
-                        ThinkingStep(step_name="AI Thinking", details=msg.content[0].get("thinking", ""))
-                    )
+                elif isinstance(msg.content, list):
+                    for item in msg.content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            response.content = item.get("text", "")
+                            break
                 else:
                     response.content = ""
 
