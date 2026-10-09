@@ -65,7 +65,7 @@ class Settings(BaseSettings):
         description="Available Google models for embedding running on cloud",
     )
     AWS_EMBEDDINGS_MODELS: list[str] = Field(
-        default=[],
+        default=["amazon.titan-embed-text-v2:0"],
         description="Available AWS models for embedding running on cloud",
     )
     OLLAMA_EMBEDDINGS_MODELS: list[str] = Field(

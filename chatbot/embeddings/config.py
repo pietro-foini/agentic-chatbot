@@ -24,6 +24,7 @@ def get_embeddings(model_name: str | None = None) -> Embeddings:
     if name in S.AWS_EMBEDDINGS_MODELS:
         return BedrockEmbeddings(
             model_id=name,
+            dimensions=S.EMBEDDINGS_SIZE,
         )
 
     if name in S.OLLAMA_EMBEDDINGS_MODELS:
