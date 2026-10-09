@@ -17,3 +17,4 @@ phases:
     commands:
       - docker push $ECR_REPO_URI:latest
       - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - echo Image pushed successfully!
