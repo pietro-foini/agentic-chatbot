@@ -18,25 +18,9 @@ class Settings(BaseSettings):
     )
     COOKIE_SECURE: bool = Field(description="Enable secure cookies; disable only for local development")
 
-    # Google Cloud Platform setting.
-    PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
-    REGION: str = Field(description="The region of the Google Cloud Platform project")
-
-    # Google Cloud Storage.
-    GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
-
     # LLM.
     # Default.
-    MODEL_NAME: str = Field(default="gemini-2.5-flash-lite", description="The default LLM model")
-    # Google.
-    GOOGLE_MODELS: dict[str, str] = Field(
-        default={
-            "gemini-2.5-flash-lite": "europe-west1",
-            "gemini-3.5-flash-lite": "global",
-            "gemini-3.8-flash": "global",
-        },
-        description="The available Google LLM models with the corresponding region",
-    )
+    MODEL_NAME: str = Field(default="qwen2.5:7b", description="The default LLM model")
     # Ollama.
     OLLAMA_MODELS: list[str] = Field(
         default=["qwen2.5:7b", "gemma4:12b"], description="The names of the Ollama LLM models"
