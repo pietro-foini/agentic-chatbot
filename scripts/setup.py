@@ -48,4 +48,14 @@ async def init_database() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(init_database())
+    import sys
+
+    if sys.platform == "win32":
+        import selectors
+
+        asyncio.run(
+            init_database(),
+            loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()),
+        )
+    else:
+        asyncio.run(init_database())
