@@ -123,14 +123,14 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
                                     id=file_metadata["id"],
                                     file_uri=item["file_id"],
                                     type=item["mime_type"],
-                                    size=file_metadata["size"],
+                                    size=file_metadata.get("size"),
                                 )
                             elif item_type == "document":  # AWS
                                 attachment_data = Attachment(
                                     id=file_metadata["id"],
                                     file_uri=item["document"]["source"]["s3Location"]["uri"],
                                     type=item["document"]["format"],
-                                    size=file_metadata["size"],
+                                    size=file_metadata.get("size"),
                                 )
 
                     response.content = "\n".join(text_parts)

@@ -1,4 +1,3 @@
-import base64
 import time
 from typing import Awaitable, Callable
 
@@ -150,7 +149,8 @@ async def inject_aws_pdf_middleware(
                         },
                     },
                     {"text": "Here is the requested PDF document. Please analyze it."},
-                ]
+                ],
+                additional_kwargs={"file_metadata": {"id": file_id}},
             )
 
             return Command(update={"messages": [result, pdf_msg]})
