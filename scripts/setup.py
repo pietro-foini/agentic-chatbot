@@ -4,6 +4,7 @@ from langchain_postgres.v2.engine import Column, PGEngine
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
+from sqlalchemy import inspect
 
 from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.settings import S
@@ -33,15 +34,16 @@ async def init_database() -> None:
             store = AsyncPostgresStore(pool)
             await store.setup()
 
-        try:
+        async with db.engine.connect() as conn:
+            table_exists = await conn.run_sync(lambda sync_conn: inspect(sync_conn).has_table(S.TABLE_NAME_VECTORS))
+
+        if not table_exists:
             await PGEngine.from_engine(engine=db.engine).ainit_vectorstore_table(
                 table_name=S.TABLE_NAME_VECTORS,
                 vector_size=S.EMBEDDINGS_SIZE,
                 metadata_columns=[Column(name="source", data_type="text")],
                 overwrite_existing=False,
             )
-        except (Exception,):
-            pass
 
     finally:
         await db.disconnect()
