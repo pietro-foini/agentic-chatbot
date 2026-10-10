@@ -5,9 +5,8 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from google.genai.errors import ServerError
+from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_postgres import PGVectorStore
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
@@ -183,10 +182,7 @@ async def process_chat(
     # Graph execution.
     try:
         response = await graph.ainvoke(graph_input, stream_mode="values", config=config, context=context)
-    except ServerError:
-        logger.exception("LLM provider unavailable (thread=%s)", thread_id)
-        raise UserFacingError("The AI service is temporarily unavailable. Please try again in a moment.")
-    except (GraphRecursionError, ChatGoogleGenerativeAIError):
+    except (GraphRecursionError, OutputParserException):
         logger.exception("Graph execution failed (thread=%s)", thread_id)
         raise UserFacingError("A system error occurred while processing your request. Please try again.")
 

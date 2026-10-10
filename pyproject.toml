@@ -23,10 +23,7 @@ pyjwt = "2.15.1"
 # LLM, Agents & Orchestration
 langchain-core = "1.6.9"
 langchain-text-splitters = "1.1.2"
-langchain-ollama = "1.1.0"
-langchain-google-genai = "4.4.0"
 langchain-postgres = "0.0.18"
-langchain-aws = "1.8.1"
 langchain = "1.4.2"
 langgraph = "1.2.12"
 langgraph-checkpoint = "4.2.0"
@@ -34,13 +31,19 @@ langgraph-checkpoint-postgres = "3.1.2"
 tiktoken = "0.14.0"
 # Database & ORM
 psycopg2-binary = "2.9.13"
-# Cloud & External Services
-google-genai = "2.25.0"
-google-cloud-storage = "3.15.0"
-boto3 = "1.43.110"
 # Visualization
 matplotlib = "3.11.2"
 seaborn = "0.13.2"
+
+# GCP
+langchain-google-genai = { version = "4.4.0", optional = true }
+google-genai = { version = "2.25.0", optional = true }
+google-cloud-storage = { version = "3.15.0", optional = true }
+# AWS
+langchain-aws = { version = "1.8.1", optional = true }
+boto3 = { version = "1.43.110", optional = true }
+# Local
+langchain-ollama = { version = "1.1.0", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 isort = "9.0.2"
@@ -54,6 +57,19 @@ notebook = "7.6.0"
 pytest-mock = "3.16.0"
 mock = "5.2.0"
 pytest = "9.1.1"
+
+[tool.poetry.extras]
+gcp = ["langchain-google-genai", "google-genai", "google-cloud-storage"]
+aws = ["langchain-aws", "boto3"]
+local = ["langchain-ollama"]
+all = [
+    "langchain-google-genai",
+    "google-genai",
+    "google-cloud-storage",
+    "langchain-aws",
+    "boto3",
+    "langchain-ollama",
+]
 
 [build-system]
 requires = ["poetry-core"]

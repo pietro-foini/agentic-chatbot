@@ -437,9 +437,10 @@ css = ["tinycss2 (>=1.1.0)"]
 name = "boto3"
 version = "1.43.110"
 description = "The AWS SDK for Python (Boto3)"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"aws\" or extra == \"all\""
 files = [
     {file = "boto3-1.43.110-py3-none-any.whl", hash = "sha256:74b811e6def4b30d685d4539a9ead3796f0e03a2112f00134e0f5e583ad8b098"},
     {file = "boto3-1.43.110.tar.gz", hash = "sha256:0251b67d99cc0e7b958db48e7dd149094d453377fcd03299fde7329f975db2e6"},
@@ -457,9 +458,10 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 name = "botocore"
 version = "1.43.110"
 description = "Low-level, data-driven core of boto 3."
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"aws\" or extra == \"all\""
 files = [
     {file = "botocore-1.43.110-py3-none-any.whl", hash = "sha256:9f5ae5685b4d7129e32f6084ae8683d5857a1d60d77528b8da77bb53b9dff48f"},
     {file = "botocore-1.43.110.tar.gz", hash = "sha256:888cd54d59502e2195dac30805e5c08dd1be5416932a3793373e81b8f463e006"},
@@ -1020,9 +1022,10 @@ test-no-images = ["pytest", "pytest-cov", "pytest-rerunfailures (<16)", "pytest-
 name = "cryptography"
 version = "50.0.1"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
-optional = false
+optional = true
 python-versions = "!=3.9.0,!=3.9.1,>=3.9"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "cryptography-50.0.1-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:b8f852c65863251b9e3a1b8c150ce21e59b522dbb6a7d4bc80e680d38388e986"},
     {file = "cryptography-50.0.1-cp311-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:53e279950892dc102c6b4e52af03ae5ea92fac572a1ddab78ca73a997f62b69f"},
@@ -1277,9 +1280,10 @@ files = [
 name = "filetype"
 version = "1.2.0"
 description = "Infer file type and MIME type of any file/buffer. No external dependencies."
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "filetype-1.2.0-py2.py3-none-any.whl", hash = "sha256:7ce71b6880181241cf7ac8697a2f1eb6a8bd9b429f7ad6d27b8db9ba5f1c2d25"},
     {file = "filetype-1.2.0.tar.gz", hash = "sha256:66b56cd6474bf41d8c54660347d37afcc3f7d1970648de365c102ef77548aadb"},
@@ -1382,9 +1386,10 @@ files = [
 name = "google-api-core"
 version = "2.39.0"
 description = "Google API client core library"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_api_core-2.39.0-py3-none-any.whl", hash = "sha256:40a5d1c892bc1798f3b75ab10c665b85717979088519c714ca5774ee81d1e3c5"},
     {file = "google_api_core-2.39.0.tar.gz", hash = "sha256:824ee414a10adefefae33fc5e2ba28dc6f0f7089d011c9cc98ea9178e61299e9"},
@@ -1408,9 +1413,10 @@ tracing = ["opentelemetry-instrumentation-grpc (>=0.65b0,<1.0.0)"]
 name = "google-auth"
 version = "2.58.1"
 description = "Google Authentication Library"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_auth-2.58.1-py3-none-any.whl", hash = "sha256:66a63572d0ab629554768544df04018d79178c0bd7439ba31683ac576b79024d"},
     {file = "google_auth-2.58.1.tar.gz", hash = "sha256:1480461d8b2347e679af758f4003700ea79a59b603c9134e18bfa95e8004ee70"},
@@ -1441,9 +1447,10 @@ urllib3 = ["packaging (>=20.0)", "urllib3 (>=1.26.15,<3.0.0)"]
 name = "google-cloud-core"
 version = "2.7.0"
 description = "Google Cloud API client core library"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_cloud_core-2.7.0-py3-none-any.whl", hash = "sha256:c18a250904cfdda021eb3ae8b8238c9f9ca272a4cbbfb5cba946b3fe3022eed1"},
     {file = "google_cloud_core-2.7.0.tar.gz", hash = "sha256:874aaf89765db87a9b911b7a2ca7c5068554868eed9e75c7766affe342a2913d"},
@@ -1460,9 +1467,10 @@ grpc = ["grpcio (>=1.59.0,<2.0.0)", "grpcio (>=1.75.1,<2.0.0) ; python_version >
 name = "google-cloud-storage"
 version = "3.15.0"
 description = "Google Cloud Storage API client library"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_cloud_storage-3.15.0-py3-none-any.whl", hash = "sha256:248905def997a300ad456c0696cf7fad04b8c38412c1103ebb2a60cc6341579f"},
     {file = "google_cloud_storage-3.15.0.tar.gz", hash = "sha256:110041ee1cb566114015aa7c2492f1ff18c92af528588386663f4b41b6279989"},
@@ -1486,9 +1494,10 @@ tracing = ["opentelemetry-api (>=1.1.0,<2.0.0)"]
 name = "google-crc32c"
 version = "1.9.0"
 description = "A python wrapper of the C library 'Google CRC32C'"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_crc32c-1.9.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:e6b529a6a287104ec79d281c411685231200ce954a29c28ab8e5093cb6e130fb"},
     {file = "google_crc32c-1.9.0-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:51cb4e23a38ad4f495f35f87c233ca3ea6b9c4559e7ac383cdef786fab0f7977"},
@@ -1527,9 +1536,10 @@ files = [
 name = "google-genai"
 version = "2.25.0"
 description = "GenAI Python SDK"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_genai-2.25.0-py3-none-any.whl", hash = "sha256:2e8f3a5f76ed00d5ffc3153f6089bc7d3511054eed53ad9cfc6095a7dc59b028"},
     {file = "google_genai-2.25.0.tar.gz", hash = "sha256:ab603baa5eee0205926ad0f8d7f93e0400df6d67650e99c33e01ab228ea16ad6"},
@@ -1556,9 +1566,10 @@ pyopenssl = ["pyopenssl"]
 name = "google-resumable-media"
 version = "2.10.2"
 description = "Utilities for Google Media Downloads and Resumable Uploads"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "google_resumable_media-2.10.2-py3-none-any.whl", hash = "sha256:e3cedc827a4ea41e216582d74346f1fb9fceb625a8c3c53912f2ca1d663334d7"},
     {file = "google_resumable_media-2.10.2.tar.gz", hash = "sha256:1de441703cd298d75a419bfdc0066e9fc7b0a1de630df96eea8ce8f5c759358c"},
@@ -1575,9 +1586,10 @@ requests = ["requests (>=2.18.0,<3.0.0)"]
 name = "googleapis-common-protos"
 version = "1.75.4"
 description = "Common protobufs used in Google APIs"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "googleapis_common_protos-1.75.4-py3-none-any.whl", hash = "sha256:e8eb9cffa9a9f3423090cc7a086012004196abab388a0561690e81887fd79cc1"},
     {file = "googleapis_common_protos-1.75.4.tar.gz", hash = "sha256:4587babdc82a8d7e5a3d4f5a6697e064bf44a598b4d08341c212b68185eadbcd"},
@@ -2038,9 +2050,10 @@ i18n = ["Babel (>=2.7)"]
 name = "jmespath"
 version = "1.1.0"
 description = "JSON Matching Expressions"
-optional = false
+optional = true
 python-versions = ">=3.9"
 groups = ["main"]
+markers = "extra == \"aws\" or extra == \"all\""
 files = [
     {file = "jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64"},
     {file = "jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d"},
@@ -2560,9 +2573,10 @@ xai = ["langchain-xai"]
 name = "langchain-aws"
 version = "1.8.1"
 description = "An integration package connecting AWS and LangChain"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"aws\" or extra == \"all\""
 files = [
     {file = "langchain_aws-1.8.1-py3-none-any.whl", hash = "sha256:81456d613d3f9a67e29db76ce52ca201f2ea2b6cb8098de7d8edd1848dc2ef87"},
     {file = "langchain_aws-1.8.1.tar.gz", hash = "sha256:45e5971881bfd9044a0b698111ac72d8697a13f6ac8d9e052f91b5b94503092d"},
@@ -2609,9 +2623,10 @@ uuid-utils = ">=0.12.0,<1.0"
 name = "langchain-google-genai"
 version = "4.4.0"
 description = "An integration package connecting Google's genai package and LangChain"
-optional = false
+optional = true
 python-versions = "<4.0.0,>=3.10.0"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "langchain_google_genai-4.4.0-py3-none-any.whl", hash = "sha256:8e23a1307bd2158590bbf9d99f1d658fc84a9d9ddb77fb1b372f8875a2bafbbf"},
     {file = "langchain_google_genai-4.4.0.tar.gz", hash = "sha256:7871beec56ac07b719f77c46997845db6ff2267b817bffb0f97877053b0895d7"},
@@ -2627,9 +2642,10 @@ pydantic = ">=2.0.0,<3.0.0"
 name = "langchain-ollama"
 version = "1.1.0"
 description = "An integration package connecting Ollama and LangChain"
-optional = false
+optional = true
 python-versions = "<4.0.0,>=3.10.0"
 groups = ["main"]
+markers = "extra == \"local\" or extra == \"all\""
 files = [
     {file = "langchain_ollama-1.1.0-py3-none-any.whl", hash = "sha256:43ac83a6eacb0f43855810739794dd55019e0d9b17bdcf3ecb3b1991ac3b59dd"},
     {file = "langchain_ollama-1.1.0.tar.gz", hash = "sha256:f776f56f6782ae4da7692579b94a6575906118318d1023b455d7207f9d059811"},
@@ -3624,9 +3640,10 @@ files = [
 name = "ollama"
 version = "0.6.2"
 description = "The official Python client for Ollama."
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"local\" or extra == \"all\""
 files = [
     {file = "ollama-0.6.2-py3-none-any.whl", hash = "sha256:3ad7daab28e5a973445c36a73882a3ef698c2ebb00e21e308652741577509f7d"},
     {file = "ollama-0.6.2.tar.gz", hash = "sha256:936d55daa684f474364c098611c933626f8d6c7d67065c5b7ae0c477b508b07f"},
@@ -3640,9 +3657,10 @@ pydantic = ">=2.9"
 name = "opentelemetry-api"
 version = "1.45.0"
 description = "OpenTelemetry Python API"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "opentelemetry_api-1.45.0-py3-none-any.whl", hash = "sha256:80e068aba7cd56c8b58512d6a36f8d25cb1dfaa0c0a4cc1c938ccf9f362d9cb3"},
     {file = "opentelemetry_api-1.45.0.tar.gz", hash = "sha256:711ede81773c8025c2c03dac0450bc89f3d30aea6eabcc815c570d4e35a963f7"},
@@ -4176,9 +4194,10 @@ wcwidth = ">=0.1.4"
 name = "proto-plus"
 version = "1.28.4"
 description = "Beautiful, Pythonic protocol buffers"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "proto_plus-1.28.4-py3-none-any.whl", hash = "sha256:4b01341272f8a348db3f003b6143109f83ab43091019d5181b3fcdf500ab32aa"},
     {file = "proto_plus-1.28.4.tar.gz", hash = "sha256:5ff7ecad828e032a491fcb86947801768e32237f99dd049b649965b892ae9a63"},
@@ -4194,9 +4213,10 @@ testing = ["google-api-core (>=2.25.0)"]
 name = "protobuf"
 version = "6.33.6"
 description = ""
-optional = false
+optional = true
 python-versions = ">=3.9"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "protobuf-6.33.6-cp310-abi3-win32.whl", hash = "sha256:7d29d9b65f8afef196f8334e80d6bc1d5d4adedb449971fefd3723824e6e77d3"},
     {file = "protobuf-6.33.6-cp310-abi3-win_amd64.whl", hash = "sha256:0cd27b587afca21b7cfa59a74dcbd48a50f0a6400cfb59391340ad729d91d326"},
@@ -4493,9 +4513,10 @@ bcrypt = ["bcrypt (>=4.1.2)"]
 name = "pyasn1"
 version = "0.6.4"
 description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs (X.208)"
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "pyasn1-0.6.4-py3-none-any.whl", hash = "sha256:deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"},
     {file = "pyasn1-0.6.4.tar.gz", hash = "sha256:9c447d8431c947fe4c8febc4ed9e760bc29011a5b01e5c74b67025bd9fb8ce81"},
@@ -4505,9 +4526,10 @@ files = [
 name = "pyasn1-modules"
 version = "0.4.2"
 description = "A collection of ASN.1-based protocols modules"
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"gcp\" or extra == \"all\""
 files = [
     {file = "pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"},
     {file = "pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6"},
@@ -5513,9 +5535,10 @@ files = [
 name = "s3transfer"
 version = "0.19.2"
 description = "An Amazon S3 Transfer Manager"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"aws\" or extra == \"all\""
 files = [
     {file = "s3transfer-0.19.2-py3-none-any.whl", hash = "sha256:d8168eccca828cbb2cd573675333f3bddd254313a9c42494b84c76b539e8ba25"},
     {file = "s3transfer-0.19.2.tar.gz", hash = "sha256:ba0309fd86be3c27dbf78cdd813c13c5e1df16e5874b99d2535ebbdfb9892993"},
@@ -6643,7 +6666,13 @@ files = [
 [package.extras]
 cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and python_version < \"3.14\"", "cffi (>=2.0.0b0) ; platform_python_implementation != \"PyPy\" and python_version >= \"3.14\""]
 
+[extras]
+all = ["boto3", "google-cloud-storage", "google-genai", "langchain-aws", "langchain-google-genai", "langchain-ollama"]
+aws = ["boto3", "langchain-aws"]
+gcp = ["google-cloud-storage", "google-genai", "langchain-google-genai"]
+local = ["langchain-ollama"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "fee5b4b660022f6703843d233e37c75e92e30fb5b0ffcc0ad706e30d479d3837"
+content-hash = "7ead88bd38140c8c7a9860f3c7a6851d950044f0fb00892459d7d2f20665471a"

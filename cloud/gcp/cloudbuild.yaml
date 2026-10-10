@@ -6,9 +6,11 @@ steps:
   args:
     - -c
     - |
-      docker build -t $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
-      --network=cloudbuild \
-      .
+      docker build \
+        --build-arg EXTRAS="gcp" \
+        -t $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
+        --network=cloudbuild \
+        .
 # Push the container image to Artifact Registry.
 - name: 'gcr.io/cloud-builders/docker'
   id: 'push-container-image'

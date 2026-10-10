@@ -1,9 +1,5 @@
 from functools import lru_cache
 
-from langchain_aws import ChatBedrockConverse
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_ollama import ChatOllama
-
 from chatbot.settings import S
 
 
@@ -14,6 +10,8 @@ def get_model(model_name: str | None = None):
     name = model_name or S.LLM_MODEL
 
     if name in S.GOOGLE_LLM_MODELS:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
         return ChatGoogleGenerativeAI(
             model=name,
             location="global",
@@ -27,6 +25,8 @@ def get_model(model_name: str | None = None):
         )
 
     if name in S.AWS_LLM_MODELS:
+        from langchain_aws import ChatBedrockConverse
+
         return ChatBedrockConverse(
             model=name,
             temperature=S.TEMPERATURE,
@@ -34,6 +34,8 @@ def get_model(model_name: str | None = None):
         )
 
     if name in S.OLLAMA_LLM_MODELS:
+        from langchain_ollama import ChatOllama
+
         return ChatOllama(
             model=name,
             temperature=S.TEMPERATURE,
