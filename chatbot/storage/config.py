@@ -6,11 +6,11 @@ def get_storage_client() -> BaseStorage:
     """Load the storage client"""
 
     if S.CLOUD_PROVIDER == CloudProvider.AWS:
-        from chatbot.storage.providers.gcp import S3Storage
+        from chatbot.storage.providers.aws import S3Storage
 
         return S3Storage()
     elif S.CLOUD_PROVIDER == CloudProvider.GCP:
-        from chatbot.storage.providers.aws import GCSStorage
+        from chatbot.storage.providers.gcp import GCSStorage
 
         return GCSStorage()
     else:
