@@ -109,10 +109,12 @@ class Settings(BaseSettings):
             and self.CLOUD_PROVIDER == CloudProvider.GCP
             and not self.INSTANCE_NAME
         ):
-            raise ValueError("INSTANCE_NAME is required when ENVIRONMENT=cloud and CLOUD_PROVIDER=GCP")
+            raise ValueError("INSTANCE_NAME is required when ENVIRONMENT=cloud and CLOUD_PROVIDER=gcp")
 
-        if self.ENVIRONMENT == Environment.CLOUD and (not self.DB_HOST or not self.DB_PORT):
-            raise ValueError("DB_HOST and DB_PORT are required for when ENVIRONMENT=local")
+        if (self.ENVIRONMENT == Environment.LOCAL or self.CLOUD_PROVIDER == CloudProvider.AWS) and (
+            not self.DB_HOST or not self.DB_PORT
+        ):
+            raise ValueError("DB_HOST and DB_PORT are required for when ENVIRONMENT=local or CLOUD_PROVIDER=aws")
 
         return self
 
