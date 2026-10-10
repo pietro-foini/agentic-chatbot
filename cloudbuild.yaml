@@ -35,7 +35,7 @@ steps:
           --set-env-vars LLM_MODEL=$_LLM_MODEL \
           --set-env-vars EMBEDDINGS_MODEL=$_EMBEDDINGS_MODEL \
           --set-env-vars DB_NAME=$_DB_NAME \
-          --set-env-vars INSTANCE_NAME=$_INSTANCE_NAME \
+          --set-env-vars INSTANCE_CONNECTION_NAME=$_INSTANCE_CONNECTION_NAME \
           --set-secrets="DB_USER=postgres_db_username:latest" \
           --set-secrets="DB_PASSWORD=postgres_db_password:latest" \
           --set-secrets="SECRET_KEY=auth_key:latest" \

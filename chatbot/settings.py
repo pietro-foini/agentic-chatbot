@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     DB_HOST: str | None = Field(default=None, description="PostgreSQL host")
     DB_PORT: int | None = Field(default=None, description="PostgreSQL port")
     # Used ONLY for GCP Cloud SQL (Unix domain socket: project:region:instance-name)
-    INSTANCE_NAME: str | None = Field(default=None, description="Cloud SQL connection name")
+    INSTANCE_CONNECTION_NAME: str | None = Field(default=None, description="Cloud SQL connection name")
 
     # Name of the table for storing vectors/embeddings.
     TABLE_NAME_VECTORS: str = Field(default="vectors", description="Database table used for vector embeddings")
@@ -107,9 +107,9 @@ class Settings(BaseSettings):
         if (
             self.ENVIRONMENT == Environment.CLOUD
             and self.CLOUD_PROVIDER == CloudProvider.GCP
-            and not self.INSTANCE_NAME
+            and not self.INSTANCE_CONNECTION_NAME
         ):
-            raise ValueError("INSTANCE_NAME is required when ENVIRONMENT=cloud and CLOUD_PROVIDER=gcp")
+            raise ValueError("INSTANCE_CONNECTION_NAME is required when ENVIRONMENT=cloud and CLOUD_PROVIDER=gcp")
 
         if (self.ENVIRONMENT == Environment.LOCAL or self.CLOUD_PROVIDER == CloudProvider.AWS) and (
             not self.DB_HOST or not self.DB_PORT
@@ -142,7 +142,7 @@ class Settings(BaseSettings):
         pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
 
         if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
-            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
 
         return f"postgresql://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
@@ -153,7 +153,7 @@ class Settings(BaseSettings):
         pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
 
         if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
-            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_NAME}"
+            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
 
         return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
