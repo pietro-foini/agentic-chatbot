@@ -6,7 +6,7 @@ steps:
   args:
     - -c
     - |
-      docker build -t $_REGION-docker.pkg.dev/$_PROJECT_ID/servers/$REPO_NAME-server:$SHORT_SHA \
+      docker build -t $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
       --network=cloudbuild \
       .
 # Push the container image to Artifact Registry.
@@ -16,7 +16,7 @@ steps:
   args:
     - -c
     - |
-      docker push $_REGION-docker.pkg.dev/$_PROJECT_ID/servers/$REPO_NAME-server:$SHORT_SHA
+      docker push $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA
 # Deploy container image to Cloud Run.
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'deploy-cloud-run'
@@ -24,29 +24,27 @@ steps:
   args:
     - -c
     - |
-      gcloud run deploy agentic-chatbot \
-          --image $_REGION-docker.pkg.dev/$_PROJECT_ID/servers/$REPO_NAME-server:$SHORT_SHA \
-          --region $_REGION \
-          --memory 4096Mi \
-          --cpu 2 \
-          --timeout 800 \
+      gcloud run deploy chatbot-service \
+          --image $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
+          --project $PROJECT_ID \
+          --region $LOCATION \
+          --memory 2048Mi \
+          --cpu 1 \
           --cpu-throttling \
           --min-instances=0 \
           --max-instances=100 \
-          --project $_PROJECT_ID \
-          --add-cloudsql-instances $_PROJECT_ID:$_REGION:$_INSTANCE_NAME \
-          --set-env-vars ENVIRONMENT=$_ENVIRONMENT \
-          --set-env-vars PROJECT_ID=$_PROJECT_ID \
-          --set-env-vars REGION=$_REGION \
-          --set-env-vars GCS_PROCESSED_BUCKET=$_GCS_PROCESSED_BUCKET \
+          --set-env-vars ENVIRONMENT="cloud" \
+          --set-env-vars CLOUD_PROVIDER="gcp" \
           --set-env-vars COOKIE_SECURE=$_COOKIE_SECURE \
+          --set-env-vars STORAGE_BUCKET=$_STORAGE_BUCKET \
+          --set-env-vars LLM_MODEL=$_LLM_MODEL \
+          --set-env-vars EMBEDDINGS_MODEL=$_EMBEDDINGS_MODEL \
           --set-env-vars DB_NAME=$_DB_NAME \
           --set-env-vars INSTANCE_NAME=$_INSTANCE_NAME \
           --set-secrets="DB_USER=postgres_db_username:latest" \
           --set-secrets="DB_PASSWORD=postgres_db_password:latest" \
-          --set-secrets="SECRET_KEY=secret_key:latest" \
+          --set-secrets="SECRET_KEY=auth_key:latest" \
           --allow-unauthenticated \
-          --labels team=ml \
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/$SERVICE_ACCOUNT'
 options:
   logging: CLOUD_LOGGING_ONLY

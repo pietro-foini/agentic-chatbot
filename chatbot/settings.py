@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = Field(default=False, description="Set True in production")
 
     # STORAGE.
-    STORAGE_BUCKET: str = Field(default="chatbot-genius", description="Target bucket name for either S3 or GCS")
+    STORAGE_BUCKET: str = Field(description="Target bucket name for either S3 or GCS")
 
     # LLM CONFIGURATION.
     LLM_MODEL: str = Field(description="Default LLM model selected for chat requests")
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
 
     # EMBEDDINGS CONFIGURATION.
     EMBEDDINGS_MODEL: str = Field(description="Default Embeddings model selected for chat requests")
-    EMBEDDINGS_SIZE: int = Field(description="Embeddings dimension size")
+    EMBEDDINGS_SIZE: int = Field(default=1024, description="Embeddings dimension size")
     GOOGLE_EMBEDDINGS_MODELS: list[str] = Field(
         default=["models/gemini-embedding-001"],
         description="Available Google models for embedding running on cloud",
