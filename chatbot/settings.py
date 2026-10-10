@@ -28,8 +28,8 @@ class Settings(BaseSettings):
         default=Environment.LOCAL,
         description="Physical deployment target: local workstation or cloud container",
     )
-    CLOUD_PROVIDER: CloudProvider = Field(
-        default=CloudProvider.GCP,
+    CLOUD_PROVIDER: CloudProvider | None = Field(
+        default=None,
         description="Active provider for managed services (Storage, LLMs, Embeddings)",
     )
 
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
 
     # STORAGE.
     STORAGE_BUCKET: str = Field(description="Target bucket name for either S3 or GCS")
+    STORAGE_ENDPOINT_URL: str = Field(
+        default="http://localhost:8333",
+        description="Endpoint URL of the S3-compatible object storage (e.g. the local SeaweedFS S3 API). "
+        "Used only for the local setup; leave it unset or empty to use the real AWS S3 endpoint.",
+    )
 
     # LLM CONFIGURATION.
     LLM_MODEL: str = Field(description="Default LLM model selected for chat requests")
@@ -101,7 +106,7 @@ class Settings(BaseSettings):
     ALLOWED_MIME_TYPES: list[str] = Field(default=["application/pdf"])
 
     @model_validator(mode="after")
-    def _validate_configuration(self) -> Self:
+    def _validate_db_configuration(self) -> Self:
         """Validate configuration"""
 
         if (
@@ -118,8 +123,23 @@ class Settings(BaseSettings):
 
         return self
 
+    @model_validator(mode="after")
+    def _validate_models_configuration(self) -> Self:
+        """Validate configuration"""
+
+        if self.LLM_MODEL not in self.all_llm_models:
+            raise ValueError("Specified model is not available")
+
+        if self.EMBEDDINGS_MODEL not in self.all_embeddings_models:
+            raise ValueError(
+                f"EMBEDDINGS_MODEL '{self.EMBEDDINGS_MODEL}' is not available. "
+                f"Choose one of: {self.all_embeddings_models}"
+            )
+
+        return self
+
     @property
-    def all_models(self) -> list[str]:
+    def all_llm_models(self) -> list[str]:
         """Aggregate list of all enabled models across environment and providers"""
 
         if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.AWS:
@@ -130,10 +150,26 @@ class Settings(BaseSettings):
             return self.AWS_LLM_MODELS
         elif self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
             return self.GOOGLE_LLM_MODELS
+        elif self.ENVIRONMENT == Environment.LOCAL and not self.CLOUD_PROVIDER:
+            return self.OLLAMA_LLM_MODELS
         else:
-            return []
+            raise ValueError(f"ENVIRONMENT={self.ENVIRONMENT} and CLOUD_PROVIDER={self.CLOUD_PROVIDER} misconfigured")
 
-    # TODO: mettere controllo su modelli default
+    @property
+    def all_embeddings_models(self) -> list[str]:
+        """Aggregate list of all enabled embeddings models across environment and providers"""
+
+        if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.OLLAMA_EMBEDDINGS_MODELS + self.AWS_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.OLLAMA_EMBEDDINGS_MODELS + self.GOOGLE_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.AWS_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.GOOGLE_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.LOCAL and not self.CLOUD_PROVIDER:
+            return self.OLLAMA_EMBEDDINGS_MODELS
+        raise ValueError(f"ENVIRONMENT={self.ENVIRONMENT} and CLOUD_PROVIDER={self.CLOUD_PROVIDER} misconfigured")
 
     @property
     def postgres_uri(self) -> str:

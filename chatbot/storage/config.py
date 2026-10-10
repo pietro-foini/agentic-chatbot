@@ -14,7 +14,13 @@ def get_storage_client() -> BaseStorage:
 
         return GCSStorage()
     else:
-        raise Exception("Invalid provider")
+        from chatbot.storage.providers.aws import S3Storage
+
+        return S3Storage(
+            endpoint_url=S.STORAGE_ENDPOINT_URL,
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+        )
 
 
 storage_client: BaseStorage = get_storage_client()

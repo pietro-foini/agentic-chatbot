@@ -117,7 +117,7 @@ async def get_chat(
             "messages": parsed_messages,
             "thread_id": str(thread_id),
             "threads": [str(thread) for thread in threads],
-            "models": S.all_models,
+            "models": S.all_llm_models,
             "default_model": S.LLM_MODEL,
             "total_cost": total_cost,
             "user": current_user,

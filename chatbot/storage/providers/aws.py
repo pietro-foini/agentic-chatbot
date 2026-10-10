@@ -12,8 +12,8 @@ from chatbot.storage.domain import BaseStorage
 class S3Storage(BaseStorage):
     """S3 storage class"""
 
-    def __init__(self):
-        self.s3 = boto3.client("s3")
+    def __init__(self, **kwargs):
+        self.s3 = boto3.client("s3", **kwargs)
 
     async def upload(self, key: str, data: bytes, content_type: str) -> str:
         """Upload file to S3 using the default bucket name"""

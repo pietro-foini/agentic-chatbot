@@ -440,7 +440,7 @@ description = "The AWS SDK for Python (Boto3)"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"aws\" or extra == \"all\""
+markers = "extra == \"aws\" or extra == \"all\" or extra == \"local\""
 files = [
     {file = "boto3-1.43.110-py3-none-any.whl", hash = "sha256:74b811e6def4b30d685d4539a9ead3796f0e03a2112f00134e0f5e583ad8b098"},
     {file = "boto3-1.43.110.tar.gz", hash = "sha256:0251b67d99cc0e7b958db48e7dd149094d453377fcd03299fde7329f975db2e6"},
@@ -461,7 +461,7 @@ description = "Low-level, data-driven core of boto 3."
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"aws\" or extra == \"all\""
+markers = "extra == \"aws\" or extra == \"all\" or extra == \"local\""
 files = [
     {file = "botocore-1.43.110-py3-none-any.whl", hash = "sha256:9f5ae5685b4d7129e32f6084ae8683d5857a1d60d77528b8da77bb53b9dff48f"},
     {file = "botocore-1.43.110.tar.gz", hash = "sha256:888cd54d59502e2195dac30805e5c08dd1be5416932a3793373e81b8f463e006"},
@@ -2053,7 +2053,7 @@ description = "JSON Matching Expressions"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"aws\" or extra == \"all\""
+markers = "extra == \"aws\" or extra == \"all\" or extra == \"local\""
 files = [
     {file = "jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64"},
     {file = "jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d"},
@@ -5538,7 +5538,7 @@ description = "An Amazon S3 Transfer Manager"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"aws\" or extra == \"all\""
+markers = "extra == \"aws\" or extra == \"all\" or extra == \"local\""
 files = [
     {file = "s3transfer-0.19.2-py3-none-any.whl", hash = "sha256:d8168eccca828cbb2cd573675333f3bddd254313a9c42494b84c76b539e8ba25"},
     {file = "s3transfer-0.19.2.tar.gz", hash = "sha256:ba0309fd86be3c27dbf78cdd813c13c5e1df16e5874b99d2535ebbdfb9892993"},
@@ -6670,9 +6670,9 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 all = ["boto3", "google-cloud-storage", "google-genai", "langchain-aws", "langchain-google-genai", "langchain-ollama"]
 aws = ["boto3", "langchain-aws"]
 gcp = ["google-cloud-storage", "google-genai", "langchain-google-genai"]
-local = ["langchain-ollama"]
+local = ["boto3", "langchain-ollama"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "7ead88bd38140c8c7a9860f3c7a6851d950044f0fb00892459d7d2f20665471a"
+content-hash = "ff3591f61366c6eea0ff864f7dd19a25919873b4a606ebb6107bb6b182c83f4b"

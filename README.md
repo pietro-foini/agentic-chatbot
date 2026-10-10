@@ -92,6 +92,8 @@ connections, which we will see later for each provider.
 
 ## Local Deployment
 
+### Database
+
 Using any graphical client (e.g. DBeaver) for the local configuration, we create a connection to PostgreSQL on port
 5432 and create a database:
 
@@ -107,28 +109,48 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 This extension is mandatory: it adds native vector similarity data types and distance operators (`<->`, `<#>`, `<=>`).
 
+### Storage
+
+For a fully local setup, object storage is provided by [SeaweedFS](https://github.com/seaweedfs/seaweedfs), which
+exposes an S3-compatible API and runs as a single executable.
+
+- Download the release for your operating system from the
+  [official releases page](https://github.com/seaweedfs/seaweedfs/releases) and extract the `weed` executable (e.g.,
+  `weed.exe`) into a folder of your choice (e.g., `C:\seaweedfs`).
+- Add that folder to your system `PATH`.
+- Create a folder where the data will be stored:
+
+```powershell
+  mkdir C:\seaweedfs-data
+```
+
+- Start SeaweedFS with the S3 module enabled:
+
+```powershell
+  weed server -s3 -dir="C:\seaweedfs-data"
+```
+
+  (Keep this terminal window running as long as you need the storage active.)
+
+Once started, the following services are available:
+
+- **Filer (file browser)**: http://localhost:8888, where you can browse, download and view the stored objects
+  (buckets are under `/buckets`).
+- **Master (cluster status)**: http://localhost:9333, to check volumes and disk space.
+- **S3 API**: http://localhost:8333.
+
+Finally, create the bucket manually (e.g., `chatbot`) and set its name in the `STORAGE_BUCKET` environment variable.
+
+### Environment
+
 To run the code locally once the desired installation steps are completed, you need to configure the environment
-variables in a dedicated `.env` file, depending on the chosen setup. The variables to set are the following:
+variables in a dedicated `.env` file, depending on the chosen setup. 
 
-```
-CLOUD_PROVIDER
-STORAGE_BUCKET
-SECRET_KEY
-COOKIE_SECURE
-LLM_MODEL
-EMBEDDINGS_MODEL
-DB_USER
-DB_PASSWORD
-DB_NAME
-DB_HOST
-DB_PORT
-```
-
-Suppose we want to test a fully local configuration. In this case, one way of populating the variables could be the 
+Suppose we want to test a fully local configuration. On local, all we have to do is create a storage bucket called 
+`your_bucket_name` from the *seaweedfs* console. In this case, one way of populating the variables could be the 
 following:
 
 ```
-CLOUD_PROVIDER=none
 STORAGE_BUCKET=your_bucket_name
 SECRET_KEY=your_super_secret_jwt_or_app_key
 COOKIE_SECURE=False
@@ -142,7 +164,7 @@ DB_PORT=5432
 ```
 
 Suppose we want to test the configuration on GCP while relying on a fully local database. On GCP, all we have done is
-create the project and a simple bucket called `your_bucket_name` from the GCP Console. In this case, one way of
+create the project and a storage bucket called `your_bucket_name` from the GCP Console. In this case, one way of
 populating the variables could be the following:
 
 ```
