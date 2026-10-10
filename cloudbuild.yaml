@@ -33,7 +33,6 @@ steps:
           --cpu-throttling \
           --min-instances=0 \
           --max-instances=100 \
-          --add-cloudsql-instances="$PROJECT_ID:$LOCATION:$_INSTANCE_NAMEa"
           --set-env-vars ENVIRONMENT="cloud" \
           --set-env-vars CLOUD_PROVIDER="gcp" \
           --set-env-vars COOKIE_SECURE=$_COOKIE_SECURE \
