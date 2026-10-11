@@ -2,6 +2,9 @@ FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
+# Defaul argument for dependencies for locale/docker-compose.
+ARG EXTRAS="all"
+
 # Install Poetry.
 RUN pip install --no-cache-dir poetry==2.5.1
 
@@ -9,7 +12,7 @@ RUN pip install --no-cache-dir poetry==2.5.1
 COPY pyproject.toml poetry.lock* ./
 
 # Configure poetry to create the virtual environment in the project root (.venv).
-RUN poetry config virtualenvs.in-project true && poetry install --only main --no-root
+RUN poetry config virtualenvs.in-project true && poetry install --extras "${EXTRAS}" --no-root
 
 FROM python:3.14-slim AS runner
 
@@ -27,8 +30,5 @@ COPY scripts/ ./scripts/
 # Add the virtual environment to PATH.
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose FastAPI backend port.
-EXPOSE 8000
-
 # Run Uvicorn directly as the primary process.
-CMD ["sh", "-c", "python -m scripts.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python -m scripts.setup && uvicorn chatbot.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

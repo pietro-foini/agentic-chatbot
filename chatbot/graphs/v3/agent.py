@@ -16,7 +16,7 @@ from langgraph.store.postgres.base import BasePostgresStore
 from chatbot.graphs.prompts import SUPERVISOR_PROMPT
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.v3.subagents import agent_1, agent_2, agent_3, agent_4
-from chatbot.llm.config import MODELS
+from chatbot.llm.config import get_model
 from chatbot.settings import S
 
 
@@ -87,7 +87,7 @@ def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
 
     # noinspection PyTypeChecker
     return create_agent(
-        model=MODELS[S.MODEL_NAME],
+        model=get_model(),
         tools=SUPERVISOR_TOOLS,
         state_schema=State,
         context_schema=Context,

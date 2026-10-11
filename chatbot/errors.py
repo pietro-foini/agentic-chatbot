@@ -20,3 +20,9 @@ class FormLoginException(Exception):
     """Raise error when the login form validation fails"""
 
     pass
+
+
+class StorageException(Exception):
+    """Raise error when storage operation fails"""
+
+    pass

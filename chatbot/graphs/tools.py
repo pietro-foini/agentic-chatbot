@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import json
-import re
 import uuid
 from io import BytesIO
 
@@ -13,7 +12,8 @@ import seaborn as sns
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
-from chatbot.db.backends.postgres import PostgresAsyncHandler
+from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.errors import StorageException
 from chatbot.graphs.security import validate_plot_code
 from chatbot.graphs.state import Context
 from chatbot.schemas.tools import (
@@ -26,7 +26,7 @@ from chatbot.schemas.tools import (
     Source,
     SQLQueryInput,
 )
-from chatbot.settings import S
+from chatbot.settings import CloudProvider, S
 from chatbot.storage.config import storage_client
 
 
@@ -252,36 +252,23 @@ async def create_plot(
     return content, artifact_data
 
 
-@tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
-async def download_and_analyze_pdf_from_gcs(
-    gcs_uri: str, runtime: ToolRuntime[Context]
+@tool("download_and_analyze_pdf_from_storage", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
+async def download_and_analyze_pdf_from_storage(
+    file_uri: str, runtime: ToolRuntime[Context]
 ) -> tuple[list[dict] | str, dict | None]:
     """
-    Download and analyze a single PDF file from Google Cloud Storage.
+    Download and analyze a single PDF file from cloud storage (S3 or GCS).
 
-    :param gcs_uri: Google Cloud Storage URI
+    :param file_uri: Cloud Storage URI (s3:// or gs://)
     :param runtime: the runtime (parameter is not visible to the model)
     :return: the content retrieval information and the corresponding artifact data
     """
 
-    # Retrieve the blob already validated by the pydantic model.
-    bucket_name, blob_path = re.match(pattern="gs://(.*?)/(.*)", string=gcs_uri).groups()  # type: ignore
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(blob_path)
-
-    # Check if the file exists.
-    exists = await asyncio.to_thread(blob.exists)
-    if not exists:
-        return "File not found", None
-
-    # Check the file size.
-    await asyncio.to_thread(blob.reload)
-    size_kb = round(blob.size / 1024, 2)
-    if size_kb > S.MAX_ATTACHMENTS_SIZE:
-        return "File exceeds size limit and was not downloaded", None
-
-    # Download the file from Cloud Storage.
-    pdf_bytes = await asyncio.to_thread(blob.download_as_bytes)
+    # Download the file.
+    try:
+        pdf_bytes = await storage_client.download(file_uri, size_limit=S.MAX_ATTACHMENTS_SIZE)
+    except StorageException:
+        return "Something went wrong during the file download", None
 
     # Assign ad ID to the current file.
     file_id = str(uuid.uuid4())
@@ -297,11 +284,24 @@ async def download_and_analyze_pdf_from_gcs(
     )
 
     # Format the output: content and artifact.
-    content = [
-        {"type": "text", "text": "Briefly describe the content of the file"},
-        {"type": "file", "file_id": gcs_uri, "mime_type": "application/pdf"},
-    ]
-    artifact_data = {"file_id": file_id, "mime_type": "application/pdf"}
+    if S.CLOUD_PROVIDER == CloudProvider.GCP:
+        content = [
+            {"type": "text", "text": "Briefly describe the content of the file"},
+            {"type": "file", "file_id": file_uri, "mime_type": "application/pdf"},
+        ]
+    elif (
+        S.CLOUD_PROVIDER == CloudProvider.AWS
+    ):  # Not all the models handle multi-modal format inside the ToolMessage (some models only into HumanMessage)
+        content = [
+            {
+                "type": "text",
+                "text": "The document is stored in S3. Direct PDF analysis inside tool messages is not supported on AWS; I have automatically attached it as a document in the next message for analysis.",
+            },
+        ]
+    else:
+        raise ValueError(f"Unsupported cloud provider: {S.CLOUD_PROVIDER}")
+
+    artifact_data = {"file_id": file_id, "mime_type": "application/pdf", "file_uri": file_uri}
 
     return content, artifact_data
 

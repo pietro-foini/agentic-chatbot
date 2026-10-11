@@ -4,7 +4,9 @@ from enum import StrEnum
 from pydantic import BaseModel, Field, field_validator
 
 from chatbot.graphs.security import wrap_sql_with_limit
-from chatbot.settings import S
+from chatbot.settings import CloudProvider, S
+
+STORAGE_SCHEME = "s3" if S.CLOUD_PROVIDER == CloudProvider.AWS else "gs"
 
 
 class Source(StrEnum):
@@ -72,9 +74,12 @@ class CodePlotInput(BaseModel):
 
 
 class PDFRetrieveInput(BaseModel):
-    """Input schema for downloading and analyzing a PDF file from Google Cloud Storage"""
+    """Input schema for downloading and analyzing a PDF file from cloud storage"""
 
-    gcs_uri: str = Field(description="Google Cloud Storage URI to a PDF file.", pattern=r"(?i)^gs://.+\.pdf$")
+    file_uri: str = Field(
+        description=f"{S.CLOUD_PROVIDER} URI to a PDF file ({STORAGE_SCHEME}://bucket/path/to/file.pdf).",
+        pattern=rf"(?i)^{STORAGE_SCHEME}://.+\.pdf$",
+    )
 
 
 class RAGInput(BaseModel):

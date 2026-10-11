@@ -14,18 +14,18 @@ from langchain.agents.middleware import (
     wrap_model_call,
     wrap_tool_call,
 )
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.postgres.base import BasePostgresSaver
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.store.postgres.base import BasePostgresStore
 from langgraph.types import Command
 
-from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS
+from chatbot.graphs.config import ALL_TOOLS, SENSITIVE_TOOLS, download_and_analyze_pdf_from_storage
 from chatbot.graphs.state import Context, State
 from chatbot.graphs.utils import extract_model_name
-from chatbot.llm.config import MODELS
+from chatbot.llm.config import get_model
 from chatbot.llm.pricing import compute_cost
-from chatbot.settings import S
+from chatbot.settings import CloudProvider, S
 
 
 @dynamic_prompt
@@ -119,13 +119,52 @@ async def track_tool_metrics(
     return result
 
 
+@wrap_tool_call
+async def inject_aws_pdf_middleware(
+    request: ToolCallRequest,
+    handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+) -> ToolMessage | Command:
+    """Inject PDF S3 URI as a HumanMessage for AWS"""
+
+    result = await handler(request)
+
+    if S.CLOUD_PROVIDER != CloudProvider.AWS or request.tool.name != download_and_analyze_pdf_from_storage.name:
+        return result
+
+    if isinstance(result, ToolMessage) and result.artifact:
+        file_id = result.artifact.get("file_id", "")
+        file_uri = result.artifact.get("file_uri")
+
+        if file_uri:
+            safe_id = file_id.replace("-", "")[:8]
+
+            pdf_msg = HumanMessage(
+                content=[
+                    {
+                        "type": "document",
+                        "document": {
+                            "format": "pdf",
+                            "name": f"attachment_{safe_id}",
+                            "source": {"s3Location": {"uri": file_uri}},
+                        },
+                    },
+                    {"text": "Here is the requested PDF document. Please analyze it."},
+                ],
+                additional_kwargs={"file_metadata": {"id": file_id}},
+            )
+
+            return Command(update={"messages": [result, pdf_msg]})
+
+    return result
+
+
 # Create the graph instance.
 def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
     """Construct an agent instance"""
 
     # noinspection PyTypeChecker
     return create_agent(
-        model=MODELS[S.MODEL_NAME],
+        model=get_model(),
         tools=ALL_TOOLS,
         state_schema=State,
         context_schema=Context,
@@ -136,6 +175,7 @@ def build_agent(checkpointer: BasePostgresSaver, store: BasePostgresStore):
             inject_dynamic_model,
             track_model_metrics,
             track_tool_metrics,
+            inject_aws_pdf_middleware,
             ModelRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
             ToolRetryMiddleware(max_retries=S.MAX_ATTEMPTS),
         ]

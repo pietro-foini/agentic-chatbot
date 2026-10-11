@@ -1,4 +1,3 @@
-import asyncio
 import re
 import uuid
 from pathlib import Path
@@ -27,13 +26,8 @@ async def save_attachment(file: UploadFile | None) -> Attachment | None:
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(file.filename).name)
     file_id = f"{uuid.uuid4()}_{safe_name}"
 
-    bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
-    blob = bucket.blob(f"attachments/{file_id}")
-    await asyncio.to_thread(blob.upload_from_string, content_bytes, content_type=file.content_type)
-
-    return Attachment(
-        id=file_id,
-        file_uri=f"gs://{S.GCS_PROCESSED_BUCKET}/attachments/{file_id}",
-        type=file.content_type,
-        size=f"{size_kb}KB",
+    file_uri = await storage_client.upload(
+        key=f"attachments/{file_id}", data=content_bytes, content_type=file.content_type
     )
+
+    return Attachment(id=file_id, file_uri=file_uri, type=file.content_type, size=f"{size_kb}KB")

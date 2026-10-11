@@ -17,7 +17,7 @@ class Attachment(BaseModel):
     id: str
     file_uri: str
     type: str
-    size: str
+    size: str | None
 
 
 class ThinkingStep(BaseModel):

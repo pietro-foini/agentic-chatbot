@@ -396,8 +396,8 @@ pyrightconfig.json
 ## mypy
 mypy_recap.txt
 
-credentials
-secrets
+.credentials
+.secrets
 
 notebooks/
 

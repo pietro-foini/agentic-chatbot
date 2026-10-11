@@ -5,9 +5,8 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from google.genai.errors import ServerError
+from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_postgres import PGVectorStore
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
@@ -31,7 +30,7 @@ from chatbot.errors import UserFacingError
 from chatbot.graphs.config import ALL_TOOLS, DEFAULT_USER_PREFERENCES
 from chatbot.graphs.prompts import SYSTEM_PROMPT
 from chatbot.graphs.state import Context
-from chatbot.llm.config import MODELS
+from chatbot.llm.config import get_model
 from chatbot.log import logger
 from chatbot.services.attachment import save_attachment
 from chatbot.services.chat import (
@@ -118,8 +117,8 @@ async def get_chat(
             "messages": parsed_messages,
             "thread_id": str(thread_id),
             "threads": [str(thread) for thread in threads],
-            "models": list(MODELS),
-            "default_model": S.MODEL_NAME,
+            "models": S.all_llm_models,
+            "default_model": S.LLM_MODEL,
             "total_cost": total_cost,
             "user": current_user,
         },
@@ -174,7 +173,7 @@ async def process_chat(
     )
     context = Context(
         thread_id=str(thread_id),
-        model=MODELS.get(model_name) or MODELS[S.MODEL_NAME],
+        model=get_model(model_name),
         system_prompt=SYSTEM_PROMPT.format(user_name=current_user.username, bot_name=S.CHATBOT_NAME),
         tools=ALL_TOOLS,
         vector_store=vector_store,
@@ -183,10 +182,7 @@ async def process_chat(
     # Graph execution.
     try:
         response = await graph.ainvoke(graph_input, stream_mode="values", config=config, context=context)
-    except ServerError:
-        logger.exception("LLM provider unavailable (thread=%s)", thread_id)
-        raise UserFacingError("The AI service is temporarily unavailable. Please try again in a moment.")
-    except (GraphRecursionError, ChatGoogleGenerativeAIError):
+    except (GraphRecursionError, OutputParserException):
         logger.exception("Graph execution failed (thread=%s)", thread_id)
         raise UserFacingError("A system error occurred while processing your request. Please try again.")
 

@@ -4,8 +4,9 @@ from langchain_postgres.v2.engine import Column, PGEngine
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
 from psycopg_pool import AsyncConnectionPool
+from sqlalchemy import inspect
 
-from chatbot.db.backends.postgres import PostgresAsyncHandler
+from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.settings import S
 
 
@@ -13,7 +14,7 @@ async def init_database() -> None:
     """Initialize relational, checkpoint, store, and vector database schemas"""
 
     db = PostgresAsyncHandler(
-        db_uri=S.postgres_uri,
+        db_uri=S.asyncpg_uri,
         readonly=False,
         statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
     )
@@ -23,13 +24,9 @@ async def init_database() -> None:
         await db.init_db()
 
         async with AsyncConnectionPool(
-            conninfo=S.asyncpg_uri,
+            conninfo=S.postgres_uri,
             kwargs={"autocommit": True},
         ) as pool:
-            await pool.open()
-
-            async with pool.connection() as conn:
-                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
             checkpointer = AsyncPostgresSaver(pool)
             await checkpointer.setup()
@@ -37,19 +34,30 @@ async def init_database() -> None:
             store = AsyncPostgresStore(pool)
             await store.setup()
 
-        try:
+        async with db.engine.connect() as conn:
+            table_exists = await conn.run_sync(lambda sync_conn: inspect(sync_conn).has_table(S.TABLE_NAME_VECTORS))
+
+        if not table_exists:
             await PGEngine.from_engine(engine=db.engine).ainit_vectorstore_table(
                 table_name=S.TABLE_NAME_VECTORS,
                 vector_size=S.EMBEDDINGS_SIZE,
                 metadata_columns=[Column(name="source", data_type="text")],
                 overwrite_existing=False,
             )
-        except (Exception,):
-            pass
 
     finally:
         await db.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(init_database())
+    import sys
+
+    if sys.platform == "win32":
+        import selectors
+
+        asyncio.run(
+            init_database(),
+            loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()),
+        )
+    else:
+        asyncio.run(init_database())

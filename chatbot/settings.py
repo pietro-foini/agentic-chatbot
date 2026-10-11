@@ -1,123 +1,197 @@
-from typing import Literal
+from enum import StrEnum
+from typing import Literal, Self
 from urllib.parse import quote_plus
 
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings
+
+
+class Environment(StrEnum):
+    """Environment to use"""
+
+    LOCAL = "local"
+    CLOUD = "cloud"
+
+
+class CloudProvider(StrEnum):
+    """Cloud provider"""
+
+    GCP = "gcp"
+    AWS = "aws"
 
 
 class Settings(BaseSettings):
     """Store here environment variables"""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",
+    # RUNTIME & ACTIVE PROVIDER.
+    ENVIRONMENT: Environment = Field(
+        default=Environment.LOCAL,
+        description="Physical deployment target: local workstation or cloud container",
+    )
+    CLOUD_PROVIDER: CloudProvider | None = Field(
+        default=None,
+        description="Active provider for managed services (Storage, LLMs, Embeddings)",
     )
 
-    # Authentication.
-    SECRET_KEY: SecretStr = Field(min_length=32, description="The secret key for the authentication")
-    ALGORITHM: Literal["HS256"] = Field(default="HS256", description="The algorithm to use for authentication")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
-        default=60, description="The number of minutes after which the access token expires"
-    )
-    COOKIE_SECURE: bool = Field(description="Enable secure cookies; disable only for local development")
+    # AUTHENTICATION.
+    SECRET_KEY: SecretStr = Field(min_length=32, description="JWT/Cookie secret key")
+    ALGORITHM: Literal["HS256"] = Field(default="HS256", description="JWT token algorithm")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, description="Token TTL in minutes")
+    COOKIE_SECURE: bool = Field(default=False, description="Set True in production")
 
-    # Google Cloud Platform setting.
-    PROJECT_ID: str = Field(description="The ID of the Google Cloud Platform project")
-
-    # Google Cloud Storage.
-    GCS_PROCESSED_BUCKET: str = Field(description="The bucket name where to store data")
-
-    # LLM.
-    # Default.
-    MODEL_NAME: str = Field(default="gemini-2.5-flash-lite", description="The default LLM model")
-    # Google.
-    GOOGLE_MODELS: dict[str, str] = Field(
-        default={
-            "gemini-2.5-flash-lite": "europe-west1",
-            "gemini-3.5-flash-lite": "global",
-            "gemini-3.8-flash": "global",
-        },
-        description="The available Google LLM models with the corresponding region",
-    )
-    # Ollama.
-    OLLAMA_MODELS: list[str] = Field(
-        default=["qwen2.5:7b", "gemma4:12b"], description="The names of the Ollama LLM models"
+    # STORAGE.
+    STORAGE_BUCKET: str = Field(description="Target bucket name for either S3 or GCS")
+    STORAGE_ENDPOINT_URL: str = Field(
+        default="http://localhost:8333",
+        description="Endpoint URL of the S3-compatible object storage (e.g. the local SeaweedFS S3 API). "
+        "Used only for the local setup; leave it unset or empty to use the real AWS S3 endpoint.",
     )
 
-    # Embeddings.
-    # Default.
-    EMBEDDINGS_NAME: str = Field(default="bge-m3:latest", description="The name of the embedding model")
-    EMBEDDINGS_SIZE: int = Field(default=1024, description="The size of the embedding model")
-
-    # Database PostgreSQL.
-    DB_USER: str = Field(description="The user of the PostgreSQL database")
-    DB_PASSWORD: SecretStr = Field(description="The password of the PostgreSQL database")
-    DB_HOST: str = Field(description="The host of the PostgreSQL database")
-    DB_PORT: int = Field(description="The port of the PostgreSQL database")
-    DB_NAME: str = Field(description="The PostgreSQL database name")
-    TABLE_NAME_VECTORS: str = Field(
-        default="vectors",
-        description="Database table used to store vector embeddings for similarity search",
+    # LLM CONFIGURATION.
+    LLM_MODEL: str = Field(description="Default LLM model selected for chat requests")
+    GOOGLE_LLM_MODELS: list[str] = Field(
+        default=["gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"],
+        description="Available Google models running on cloud",
+    )
+    AWS_LLM_MODELS: list[str] = Field(
+        default=["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0"],
+        description="Available AWS Bedrock models running on cloud",
+    )
+    OLLAMA_LLM_MODELS: list[str] = Field(
+        default=["qwen2.5:7b", "gemma4:12b"],
+        description="Available Ollama models running locally",
     )
 
-    # Assistant.
-    CHATBOT_NAME: str = Field(default="Genius", description="The chatbot name")
-    TEMPERATURE: float = Field(ge=0, le=1, default=0.9, description="Controls randomness in LLM responses")
-    MAX_TOKENS: int = Field(
-        default=1000,
-        description="Maximum number of tokens the LLM can generate per request",
+    # EMBEDDINGS CONFIGURATION.
+    EMBEDDINGS_MODEL: str = Field(description="Default Embeddings model selected for chat requests")
+    EMBEDDINGS_SIZE: int = Field(default=1024, description="Embeddings dimension size")
+    GOOGLE_EMBEDDINGS_MODELS: list[str] = Field(
+        default=["models/gemini-embedding-001"],
+        description="Available Google models for embedding running on cloud",
     )
-    THINKING_BUDGET: int = Field(
-        default=1024,
-        description="Internal LLM processing budget for a single request",
+    AWS_EMBEDDINGS_MODELS: list[str] = Field(
+        default=["amazon.titan-embed-text-v2:0"],
+        description="Available AWS models for embedding running on cloud",
     )
-    TIMEOUT_LLM: int = Field(
-        default=120,
-        description="Timeout for single LLM call",
+    OLLAMA_EMBEDDINGS_MODELS: list[str] = Field(
+        default=["bge-m3:latest"],
+        description="Available Ollama models for embedding running locally",
     )
-    MAX_ATTACHMENTS_SIZE: int = Field(default=1024, description="Maximum file size per attachment in kilobytes")
-    RECURSION_LIMIT: int = Field(
-        default=25,
-        description="Max recursive steps the agent can perform per request",
-    )
-    MAX_ATTEMPTS: int = Field(
-        default=3,
-        description="Maximum retries if an agent node fails during execution",
-    )
-    SQL_STATEMENT_TIMEOUT_MS: int = Field(
-        default=8000,
-        description="PostgreSQL statement_timeout applied to agent SQL connections, in milliseconds",
-    )
-    SQL_RESULT_LIMIT: int = Field(
-        default=100,
-        description="Maximum number of rows returned by agent SQL queries",
-    )
-    PLOT_EXEC_TIMEOUT_SECONDS: int = Field(
-        default=8,
-        description="Maximum seconds allowed for generated plot code to run",
-    )
-    ALLOWED_MIME_TYPES: list[str] = Field(
-        default=["application/pdf", "image/png", "image/jpeg"],
-        description="Allowed mime types for attachment",
-    )
+
+    # DATABASE (PostgreSQL / AWS RDS / GCP Cloud SQL).
+    DB_USER: str = Field(description="PostgreSQL username")
+    DB_PASSWORD: SecretStr = Field(description="PostgreSQL password")
+    DB_NAME: str = Field(description="PostgreSQL database name")
+    # Used for Localhost and AWS RDS (both use standard host:port)
+    DB_HOST: str | None = Field(default=None, description="PostgreSQL host")
+    DB_PORT: int | None = Field(default=None, description="PostgreSQL port")
+    # Used ONLY for GCP Cloud SQL (Unix domain socket: project:region:instance-name)
+    INSTANCE_CONNECTION_NAME: str | None = Field(default=None, description="Cloud SQL connection name")
+
+    # Name of the table for storing vectors/embeddings.
+    TABLE_NAME_VECTORS: str = Field(default="vectors", description="Database table used for vector embeddings")
+
+    # ASSISTANT & AGENT RUNTIME.
+    CHATBOT_NAME: str = Field(default="Genius", description="Assistant display name")
+    TEMPERATURE: float = Field(ge=0.0, le=1.0, default=0.7)
+    MAX_TOKENS: int = Field(default=2048)
+    THINKING_BUDGET: int = Field(default=1024)
+    TIMEOUT_LLM: int = Field(default=120)
+    MAX_ATTACHMENTS_SIZE: int = Field(default=1024)
+    RECURSION_LIMIT: int = Field(default=25)
+    MAX_ATTEMPTS: int = Field(default=3)
+    SQL_STATEMENT_TIMEOUT_MS: int = Field(default=8000)
+    SQL_RESULT_LIMIT: int = Field(default=100)
+    PLOT_EXEC_TIMEOUT_SECONDS: int = Field(default=8)
+    ALLOWED_MIME_TYPES: list[str] = Field(default=["application/pdf"])
+
+    @model_validator(mode="after")
+    def _validate_db_configuration(self) -> Self:
+        """Validate configuration"""
+
+        if (
+            self.ENVIRONMENT == Environment.CLOUD
+            and self.CLOUD_PROVIDER == CloudProvider.GCP
+            and not self.INSTANCE_CONNECTION_NAME
+        ):
+            raise ValueError("INSTANCE_CONNECTION_NAME is required when ENVIRONMENT=cloud and CLOUD_PROVIDER=gcp")
+
+        if (self.ENVIRONMENT == Environment.LOCAL or self.CLOUD_PROVIDER == CloudProvider.AWS) and (
+            not self.DB_HOST or not self.DB_PORT
+        ):
+            raise ValueError("DB_HOST and DB_PORT are required for when ENVIRONMENT=local or CLOUD_PROVIDER=aws")
+
+        return self
+
+    @model_validator(mode="after")
+    def _validate_models_configuration(self) -> Self:
+        """Validate configuration"""
+
+        if self.LLM_MODEL not in self.all_llm_models:
+            raise ValueError("Specified model is not available")
+
+        if self.EMBEDDINGS_MODEL not in self.all_embeddings_models:
+            raise ValueError(
+                f"EMBEDDINGS_MODEL '{self.EMBEDDINGS_MODEL}' is not available. "
+                f"Choose one of: {self.all_embeddings_models}"
+            )
+
+        return self
+
+    @property
+    def all_llm_models(self) -> list[str]:
+        """Aggregate list of all enabled models across environment and providers"""
+
+        if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.OLLAMA_LLM_MODELS + self.AWS_LLM_MODELS
+        elif self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.OLLAMA_LLM_MODELS + self.GOOGLE_LLM_MODELS
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.AWS_LLM_MODELS
+        elif self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.GOOGLE_LLM_MODELS
+        elif self.ENVIRONMENT == Environment.LOCAL and not self.CLOUD_PROVIDER:
+            return self.OLLAMA_LLM_MODELS
+        else:
+            raise ValueError(f"ENVIRONMENT={self.ENVIRONMENT} and CLOUD_PROVIDER={self.CLOUD_PROVIDER} misconfigured")
+
+    @property
+    def all_embeddings_models(self) -> list[str]:
+        """Aggregate list of all enabled embeddings models across environment and providers"""
+
+        if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.OLLAMA_EMBEDDINGS_MODELS + self.AWS_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.LOCAL and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.OLLAMA_EMBEDDINGS_MODELS + self.GOOGLE_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.AWS:
+            return self.AWS_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return self.GOOGLE_EMBEDDINGS_MODELS
+        if self.ENVIRONMENT == Environment.LOCAL and not self.CLOUD_PROVIDER:
+            return self.OLLAMA_EMBEDDINGS_MODELS
+        raise ValueError(f"ENVIRONMENT={self.ENVIRONMENT} and CLOUD_PROVIDER={self.CLOUD_PROVIDER} misconfigured")
 
     @property
     def postgres_uri(self) -> str:
-        """URI for standard PostgreSQL drivers (psycopg / psycopg_pool)"""
-        return (
-            f"postgresql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+        """Synchronous URI for psycopg"""
+
+        pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
+
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return f"postgresql://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
+
+        return f"postgresql://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     @property
     def asyncpg_uri(self) -> str:
-        """URI for SQLAlchemy + asyncpg driver"""
-        return (
-            f"postgresql+asyncpg://{self.DB_USER}:{quote_plus(self.DB_PASSWORD.get_secret_value())}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+        """Asynchronous URI for SQLAlchemy and asyncpg"""
+
+        pwd = quote_plus(self.DB_PASSWORD.get_secret_value())
+
+        if self.ENVIRONMENT == Environment.CLOUD and self.CLOUD_PROVIDER == CloudProvider.GCP:
+            return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
+
+        return f"postgresql+asyncpg://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 S = Settings()  # type: ignore[call-arg]

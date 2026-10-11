@@ -7,6 +7,7 @@ from more_itertools import split_before
 
 from chatbot.db.models import UserModel
 from chatbot.schemas.chat import AssistantResponse, Attachment, ThinkingStep, UserResponse
+from chatbot.settings import CloudProvider, S
 
 
 def get_last_turn_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
@@ -26,8 +27,21 @@ def build_human_message(user: UserModel, text: str, attachment: Attachment | Non
     additional_kwargs: dict = {}
 
     if attachment:
-        content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
         additional_kwargs["file_metadata"] = {"id": attachment.id, "size": attachment.size}
+        if S.CLOUD_PROVIDER == CloudProvider.GCP:
+            content.append({"type": "file", "mime_type": attachment.type, "file_id": attachment.file_uri})
+        if S.CLOUD_PROVIDER == CloudProvider.AWS:
+            safe_id = attachment.id.replace("-", "")[:8]
+            content.append(
+                {
+                    "type": "document",
+                    "document": {
+                        "format": "pdf",
+                        "name": f"attachment_{safe_id}",
+                        "source": {"s3Location": {"uri": attachment.file_uri}},
+                    },
+                }
+            )
 
     return HumanMessage(
         id=str(uuid.uuid4()),
@@ -104,12 +118,19 @@ async def extract_user_response(thread_id: str, messages: list[BaseMessage]) -> 
                             item_type = item.get("type")
                             if item_type == "text" and isinstance(item.get("text"), str):
                                 text_parts.append(item["text"])
-                            elif item_type in ("media", "image", "file"):
+                            elif item_type == "file":  # GCP
                                 attachment_data = Attachment(
                                     id=file_metadata["id"],
                                     file_uri=item["file_id"],
                                     type=item["mime_type"],
-                                    size=file_metadata["size"],
+                                    size=file_metadata.get("size"),
+                                )
+                            elif item_type == "document":  # AWS
+                                attachment_data = Attachment(
+                                    id=file_metadata["id"],
+                                    file_uri=item["document"]["source"]["s3Location"]["uri"],
+                                    type=item["document"]["format"],
+                                    size=file_metadata.get("size"),
                                 )
 
                     response.content = "\n".join(text_parts)
@@ -161,19 +182,11 @@ async def extract_assistant_response(
             elif msg.content:
                 if isinstance(msg.content, str):
                     response.content = msg.content
-                elif isinstance(msg.content, list) and isinstance(msg.content[0], str):
-                    response.content = msg.content[0]
-                elif isinstance(msg.content, list) and isinstance(msg.content[0].get("text"), str):
-                    response.content = msg.content[0].get("text", "")
-                elif (
-                    isinstance(msg.content, list)
-                    and isinstance(msg.content[0].get("thinking"), str)
-                    and isinstance(msg.content[1].get("text"), str)
-                ):
-                    response.content = msg.content[1].get("text", "")
-                    response.thinking.append(
-                        ThinkingStep(step_name="AI Thinking", details=msg.content[0].get("thinking", ""))
-                    )
+                elif isinstance(msg.content, list):
+                    for item in msg.content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            response.content = item.get("text", "")
+                            break
                 else:
                     response.content = ""
 
