@@ -13,7 +13,7 @@ from psycopg_pool import AsyncConnectionPool
 from chatbot.api.routes import auth_router, chat_router
 from chatbot.db.postgres import PostgresAsyncHandler
 from chatbot.embeddings.config import get_embeddings
-from chatbot.errors import AuthenticationRequiredError, FormRegisterException, UserFacingError
+from chatbot.errors import AuthenticationRequiredError, FormLoginException, FormRegisterException, UserFacingError
 from chatbot.graphs.agent import build_agent
 from chatbot.settings import S
 
@@ -113,6 +113,18 @@ async def form_exception_handler(request: Request, exc: FormRegisterException):
     return templates.TemplateResponse(
         request=request,
         name="register.html",
+        context={"error": str(exc)},
+        status_code=200,
+    )
+
+
+@app.exception_handler(FormLoginException)
+async def login_exception_handler(request: Request, exc: FormLoginException):
+    """Handle the exception raised when the login form validation fails"""
+
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
         context={"error": str(exc)},
         status_code=200,
     )
