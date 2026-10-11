@@ -386,4 +386,319 @@ The deployment pipeline is fully automated via Cloud Build:
 The build process reads `cloud/gcp/cloudbuild.yaml`, builds the container, pushes it to Artifact Registry, and deploys
 a new revision directly to Cloud Run. The service outputs a secure HTTPS URL where the application is live.
 
-## on Amazon Web Services (AWS) Deployment
+## Amazon Web Services (AWS) Deployment
+
+An active Amazon Web Services account with billing enabled and sufficient IAM permissions (e.g., `AdministratorAccess`
+or equivalent).
+
+Throughout this guide, `<ACCOUNT_ID>` refers to your 12-digit AWS account ID and `<REGION>` to your target region
+(e.g., `eu-north-1`).
+
+> [!NOTE]
+> Before launching resources on AWS, you can estimate the monthly operating costs using the official
+> [AWS Pricing Calculator](https://calculator.aws/).
+
+> [!IMPORTANT]
+> The entire cloud infrastructure described below has been defined and automated using **Terraform**. The complete
+> Infrastructure as Code (IaC) configuration is available in the following repository:
+> [pietro-foini/terraform-aws](https://github.com/pietro-foini/terraform-aws).
+
+While Terraform provisions the resources deterministically, the sections below explain how each service is structured,
+how the pieces fit together, and how you can manage or inspect them manually.
+
+### Network Setup (VPC and Security Group)
+
+Every AWS region comes with a **default VPC** (Virtual Private Cloud): a ready-to-use virtual network that already has
+one public subnet per Availability Zone and an Internet Gateway attached. For this project we simply reuse it, so there
+is no need to create subnets, route tables or gateways. Both the RDS database and the EC2 instance will live in this
+VPC, which lets them talk to each other over the internal network.
+
+What we do create is a dedicated **security group** for the database. A security group is a stateful firewall attached
+to a resource: only traffic matching one of its inbound rules can reach it. Creating a new one, instead of editing the
+`default` security group shared by every resource in the VPC, keeps the project rules isolated and easy to audit.
+
+Let's then create a security group for the RDS database:
+
+- Navigate to VPC > Security groups (or EC2 > Security Groups) and click Create security group.
+- Name: `ml-rds-sg`, description: `Inbound rules for RDS PostgreSQL`, VPC: the default VPC.
+- Inbound rules, add:
+  - Type: `PostgreSQL` (port `5432`)
+  - Source: `My IP`, or `0.0.0.0/0` during initial development.
+- Outbound rules: keep the default `All traffic` towards `0.0.0.0/0`.
+- Click Create security group.
+
+The security group of the application (EC2) will be created later in the same VPC, and the RDS group will be updated to
+accept traffic from it.
+
+### Amazon RDS Setup
+
+On AWS, the relational database layer (the equivalent of GCP Cloud SQL) is managed by Amazon RDS for PostgreSQL.
+
+- Navigate to RDS > Databases in the AWS Management Console.
+- Click Create database, choose Standard create and select the PostgreSQL engine.
+- Under Templates, select Free tier or Dev/Test.
+- Configure the settings:
+  - DB instance identifier: `postgres`
+  - Master username: `postgres`
+  - Master password: choose a strong password.
+  - Instance class: choose the size that fits your budget. For testing, a burstable class such as `db.t4g.micro`
+    (2 vCPUs, 1 GiB RAM, about 0.019 USD/hour) is enough.
+  - Storage: 20 GiB.
+- Under Connectivity:
+  - Virtual private cloud (VPC): the default VPC.
+  - DB subnet group: `default`.
+  - Set Public access to `Yes` (by default the database is created as private). This is needed to reach it from your
+    local machine.
+  - VPC security group: choose existing and select `ml-rds-sg`.
+
+> [!NOTE]
+> Unlike GCP Cloud SQL Studio, AWS RDS does not provide an in-browser query editor. You need an external client such as
+> DBeaver, pgAdmin or the PostgreSQL extension for VS Code.
+
+#### How does it work?
+
+An RDS instance is reachable through a public endpoint (e.g., `chatbot.xxxxxx.<REGION>.rds.amazonaws.com`) on port
+`5432`. Unlike Cloud SQL, there is no proxy: access is controlled entirely by the **security group** attached to the
+instance, which acts as a firewall. Only traffic matching one of its inbound rules reaches the database. Public access
+alone is therefore not enough: you must also open port `5432` to your IP.
+
+#### Setup Steps
+
+- Once the instance is available, copy the Endpoint from the Connectivity & security tab. The inbound rule on port
+  `5432` was already defined in `ml-rds-sg` (see the Network Setup section): if your IP changes, update the source of that
+  rule.
+
+> [!WARNING]
+> These options are not suitable for production. `0.0.0.0/0` exposes port `5432` to the whole internet, and `My IP` is
+> fragile if your IP changes (home/office modems with dynamic IPs, mobile hotspots): you will have to update the rule
+> every time. In production, keep RDS private (Public access: `No`) and allow ingress only from the application
+> security group (see the EC2 section) or through a bastion host / SSH tunnel.
+
+- Open DBeaver, select New Connection > PostgreSQL and fill in:
+  - Host: the RDS Endpoint (found in the Connectivity & security tab).
+  - Port: `5432`
+  - Database: `postgres`
+  - Username: `postgres` and the password chosen at creation.
+- Open an SQL console and create the production database:
+
+  ```sql
+  CREATE DATABASE chatbot;
+  ```
+
+- Switch the connection to the `chatbot` database and activate the vector extension:
+
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS vector;
+  ```
+
+For this configuration, i.e. running locally with a connection to RDS, it is enough to set these environment
+variables:
+
+```
+CLOUD_PROVIDER=aws
+ENVIRONMENT=local
+STORAGE_BUCKET=your_bucket_name
+SECRET_KEY=your_super_secret_jwt_or_app_key
+COOKIE_SECURE=False
+LLM_MODEL=amazon.nova-lite-v1:0
+EMBEDDINGS_MODEL=amazon.titan-embed-text-v2:0
+DB_USER=postgres
+DB_PASSWORD=your_secure_password
+DB_NAME=chatbot
+DB_HOST=chatbot.xxxxxx.<REGION>.rds.amazonaws.com
+DB_PORT=5432
+AWS_DEFAULT_REGION=<REGION>
+AWS_REGION=<REGION>
+```
+
+### Amazon ECR
+
+On AWS, Docker images are stored in Amazon ECR (Elastic Container Registry), the equivalent of GCP Artifact Registry.
+
+- Navigate to Amazon ECR > Repositories in the AWS Console.
+- Click Create repository, set the visibility to Private and choose a name (e.g., `ml-servers`).
+- Take note of the repository URI, which has the format `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/<REPO_NAME>`.
+
+### AWS Secrets Manager
+
+On AWS, secret variables that should not be exposed are managed by AWS Secrets Manager, the equivalent of GCP Secret
+Manager.
+
+- Navigate to Secrets Manager in the AWS Console and click Store a new secret.
+- Select the secret type Other type of secret.
+- Unlike GCP, where each value is a separate secret, here all the values can be stored as key/value pairs in a single
+  secret named `ml-secrets`:
+  - `postgres_db_username`
+  - `postgres_db_password`
+  - `auth_key`
+- Populate them and complete the wizard (automatic rotation disabled).
+
+The application host retrieves all of them with a single API call (see the EC2 section).
+
+### AWS CodeBuild
+
+
+The build pipeline is automated via AWS CodeBuild, the equivalent of GCP Cloud Build. Differently from GCP, where
+Cloud Build also deploys to Cloud Run, here CodeBuild only builds the image and pushes it to ECR. The deployment on EC2
+is handled separately (see next section).
+
+- Navigate to CodeBuild > Build projects and click Create build project.
+- Project name: `ml-chatbot`.
+- Source:
+  - Select GitHub as provider. If no credentials are present, click Connect to GitHub and authorize the
+    AWS CodeBuild OAuth app.
+  - Select Repository in my GitHub account and choose your repository.
+- Primary source webhook events:
+  - Check Rebuild every time a code change is pushed to this repository.
+  - Event type: `PUSH`.
+  - Start build filter: type `HEAD_REF` with pattern `^refs/heads/master$`.
+  - Comment approval: `Disabled`.
+- Environment:
+  - Managed image (Amazon Linux, standard runtime) with the Docker container running mode.
+  - Compute: the smallest size is enough.
+  - Privileged: enable this flag (_"Enable this flag if you want to build Docker images"_). It is required to run the
+    Docker daemon inside CodeBuild. AWS disables it by default following the principle of least privilege, since
+    CodeBuild is a generic runner and not specific to containers like Cloud Build.
+- Buildspec: select Use a buildspec file and keep the default `buildspec.yml` in the root of the repository (in our case
+    `cloud/aws/buildspec.yml`.
+- Select the service account that we are going to create below.
+
+#### IAM Role
+
+#### CodeBuild IAM Role (Manual Setup vs Terraform)
+
+- CodeBuild generated an initial base role (`CodeBuildBasePolicy-...` for CloudWatch logging). Two managed policies are 
+  then manually attached:
+  - `AmazonEC2ContainerRegistryPowerUser`: allows Docker login and pushing images to ECR.
+  - `SecretsManagerReadWrite`: allows reading environment secrets during build time.
+
+Every push on the target branch builds the container and pushes the updated `:latest` tag to ECR.
+
+### Amazon EC2
+
+The service that runs the container hosting our application is deployed on an Amazon EC2 instance running Docker,
+which gives full control over the host. Serverless alternatives, closer to GCP Cloud Run, are AWS App Runner (which can
+automatically redeploy when a new `:latest` image is pushed to ECR) and ECS Fargate.
+
+#### IAM Role
+
+The instance needs to pull images from ECR, read the secrets and access S3 and Bedrock, without static access keys.
+
+- Navigate to IAM > Roles > Create role, select AWS service as trusted entity and EC2 as use case.
+- Attach the managed policy `AmazonEC2ContainerRegistryReadOnly` and `SecretsManagerReadWrite`.
+- Name the role (e.g., `<ACCOUNT_ID>-ec2-role`) and create it.
+
+#### Security Groups
+
+- Navigate to EC2 > Security Groups > Create security group, name it `ml-ec2-sg` and place it in the same VPC as
+  RDS (the default VPC).
+- Inbound rules:
+  - `SSH` (port `22`): `My IP`. To connect with the browser-based EC2 Instance Connect, the source must instead be
+    `0.0.0.0/0` (or the AWS Instance Connect IP range), otherwise the firewall rejects the connection.
+  - `Custom TCP` (port `8000`): `0.0.0.0/0`, so the API is reachable from the internet.
+- Outbound rules: make sure there is a rule `All traffic` towards `0.0.0.0/0`. If the table is empty, the machine
+  cannot resolve DNS nor download images and packages.
+- Allow the instance to reach the database: in the RDS security group (`ml-rds-sg`), add an inbound rule
+  `PostgreSQL` (port `5432`) with source `ml-ec2-sg`. This way PostgreSQL traffic is accepted from the application
+  server, with no need to expose the database to the internet.
+
+#### Launch the Instance
+
+- Navigate to EC2 > Instances > Launch instances.
+- Name: `chatbot-service`.
+- AMI: Amazon Linux 2023 (AWS CLI preinstalled).
+- Instance type: `t3.medium` (2 vCPUs, 4 GiB RAM), or `t3.small` for low-cost tests.
+- Key pair: select an existing one or create a new `.pem` key pair.
+- Network settings: same VPC as RDS (the default VPC), any of its subnets, Auto-assign public IP `Enable`, security
+  group `ml-ec2-sg`.
+- Advanced details: IAM instance profile `<ACCOUNT_ID>-ec2-role`.
+
+#### Connect to the Instance
+
+Everything runs on AWS: the terminal only acts as a remote control for the Linux machine.
+
+- Option A, EC2 Instance Connect (recommended): in EC2 > Instances select `chatbot-service`, click Connect, choose
+  EC2 Instance Connect and click Connect. A terminal opens in the browser, with nothing to configure locally.
+- Option B, SSH from your terminal:
+
+  ```bash
+  # Windows PowerShell only: fix the key permissions
+  icacls key.pem /inheritance:r
+  icacls key.pem /grant:r "$($env:USERNAME):(R)"
+
+  ssh -i key.pem ec2-user@<EC2_PUBLIC_IP>
+  ```
+
+#### Deploy the Container
+
+Run these commands inside the instance.
+
+```bash
+# 1. Install Docker and jq
+sudo dnf update -y
+sudo dnf install -y docker jq
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+newgrp docker
+
+# 2. Environment
+export AWS_REGION="<REGION>"
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export ECR_REPO="servers"
+export IMAGE_TAG="latest"
+
+# 3. Login to ECR and pull the image
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+docker pull $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+
+# 4. Read the secrets
+SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id chatbot --region $AWS_REGION --query SecretString --output text)
+export DB_USER=$(echo $SECRET_JSON | jq -r .postgres_db_username)
+export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .postgres_db_password)
+export SECRET_KEY=$(echo $SECRET_JSON | jq -r .secret_key)
+
+# 5. Run the container
+docker run -d \
+  --name chatbot-service \
+  --restart always \
+  -p 8000:8000 \
+  -e PORT=8000 \
+  -e CLOUD_PROVIDER="aws" \
+  -e ENVIRONMENT="cloud" \
+  -e AWS_DEFAULT_REGION="$AWS_REGION" \
+  -e AWS_REGION="$AWS_REGION" \
+  -e LLM_MODEL="amazon.nova-lite-v1:0" \
+  -e EMBEDDINGS_MODEL="amazon.titan-embed-text-v2:0" \
+  -e DB_NAME="chatbot" \
+  -e DB_HOST="<RDS_ENDPOINT>" \
+  -e DB_PORT=5432 \
+  -e DB_USER="$DB_USER" \
+  -e DB_PASSWORD="$DB_PASSWORD" \
+  -e SECRET_KEY="$SECRET_KEY" \
+  -e STORAGE_BUCKET="<STORAGE_BUCKET_NAME>" \
+  -e COOKIE_SECURE="false" \
+  $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+```
+
+The same commands are automated through the EC2 `user_data` in Terraform.
+
+Once the container is running, the API and the Swagger UI are available at `http://<EC2_PUBLIC_IP>:8000`.
+
+#### Monitoring and Redeploy
+
+- Bootstrap logs (when using `user_data`): `sudo cat /var/log/cloud-init-output.log`
+- Running containers and live logs:
+
+  ```bash
+  docker ps
+  docker logs -f chatbot-service
+  ```
+
+- Differently from Cloud Run, a new image pushed to ECR is not deployed automatically. To redeploy, remove the old
+  container and start a new one (repeat step 3 and the `docker run` of step 5 above):
+
+  ```bash
+  docker stop chatbot-service
+  docker rm chatbot-service
+  docker pull $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+  ```
