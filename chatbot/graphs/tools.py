@@ -43,7 +43,7 @@ async def list_tables(db_name: DBName) -> str:
     # Define the database.
     if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -79,7 +79,7 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     # Define the database.
     if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
@@ -119,7 +119,7 @@ async def execute_sql(
     # Define the database.
     if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
         db = PostgresAsyncHandler(
-            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
             readonly=True,
             statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
