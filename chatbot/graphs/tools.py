@@ -1,88 +1,347 @@
+import asyncio
 import base64
-import re
-from datetime import timedelta
-from pathlib import Path
+import json
+import uuid
+from io import BytesIO
+from urllib.parse import quote_plus
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
-from chatbot.graphs.data import OutputTool, Source
-from chatbot.graphs.models import PDFRetrieveInput, RAGInput
-from chatbot.settings import S
+from chatbot.db.postgres import PostgresAsyncHandler
+from chatbot.errors import StorageException
+from chatbot.graphs.security import validate_plot_code
+from chatbot.graphs.state import Context
+from chatbot.schemas.tools import (
+    CodePlotInput,
+    DBName,
+    DescribeTableInput,
+    ListTablesInput,
+    PDFRetrieveInput,
+    RAGInput,
+    Source,
+    SQLQueryInput,
+)
+from chatbot.settings import CloudProvider, Environment, S
 from chatbot.storage.config import storage_client
 
 
-@tool("download_and_analyze_pdf_from_gcs", args_schema=PDFRetrieveInput, response_format="content")
-def download_and_analyze_pdf_from_gcs(gcs_uri: str) -> OutputTool:
+@tool("list_tables", args_schema=ListTablesInput, response_format="content")
+async def list_tables(db_name: DBName) -> str:
     """
-    Retrieve, download and analyze a single PDF file from Google Cloud Storage.
+    Retrieve a list of all available tables in a specified PostgreSQL database.
 
-    :param gcs_uri: Google Cloud Storage URI in format 'gs://bucket-name/path/to/file.pdf'
-    :type gcs_uri: str
-    :return: message status, with a Base64 encoded PDF artifact
-    :rtype: OutputTool
+    :param db_name: name of the database to list tables from
+    :return: list of table names
     """
+
+    # Define the database.
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
 
     try:
-        bucket_name, blob_path = re.match("gs://(.*?)/(.*)", gcs_uri).groups()
-        bucket = storage_client.bucket(bucket_name)
-        blob = bucket.get_blob(blob_path)
+        query = """
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public';
+        """
+        result = await db.query(query)
+        return json.dumps(result)
+    finally:
+        await db.disconnect()
 
-        if not blob.exists():
-            return OutputTool(status="error", content="File not found")
 
-        pdf_bytes = blob.download_as_bytes()
-        pdf_base64 = base64.b64encode(pdf_bytes)
-        size = round(len(pdf_bytes) / 1024, 2)
+@tool("describe_table", args_schema=DescribeTableInput, response_format="content")
+async def describe_table(db_name: DBName, table_name: str) -> str:
+    """
+    Retrieve information about a PostgreSQL table, like information, schema and column details.
 
-        if size > S.MAX_ATTACHMENTS_SIZE:
-            return OutputTool(
-                status="success",
-                content=[
-                    {
-                        "type": "text",
-                        "text": "File successfully downloaded, but it cannot be analyzed because it exceeds size limit",
-                    },
-                ],
-                artifact={"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"},
-            )
+    :param db_name: name of the database containing the table
+    :param table_name: the name of the table to search info about
+    :return: the table information
+    """
 
-        bucket = storage_client.bucket(S.GCS_PROCESSED_BUCKET)
-        blob = bucket.blob(f"downloads/{Path(blob_path).name}")
-        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
-
-        return OutputTool(
-            status="success",
-            content=[
-                {"type": "text", "text": "File successfully downloaded"},
-                {"type": "media", "mime_type": "application/pdf", "file_uri": gcs_uri},
-            ],
-            artifact={"type": "pdf", "base64": f"data:application/pdf;base64,{pdf_base64.decode('utf-8')}"},
+    # Define the database.
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
         )
-    except Exception as e:
-        return OutputTool(status="error", content=f"Error processing file: {e}")
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+
+    try:
+        query = """
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = :table_name;
+        """
+        result = await db.query(query, {"table_name": table_name})
+        return json.dumps(result)
+    finally:
+        await db.disconnect()
 
 
-@tool("retrieve_information_from_source", args_schema=RAGInput, response_format="content")
-async def retrieve_information_from_source(query: str, source: Source, runtime: ToolRuntime) -> OutputTool:
+@tool("execute_postgresql_sql", args_schema=SQLQueryInput, response_format="content_and_artifact")
+async def execute_sql(
+    query: str, db_name: DBName, ref_table_name: str, runtime: ToolRuntime[Context]
+) -> tuple[dict | str, dict | None]:
+    """
+    Executes a SQL query on PostgreSQL and returns the result as a parsed table.
+
+    :param query: the SQL query to execute on PostgreSQL
+    :param db_name: name of the database to use for applying the query
+    :param ref_table_name: logical name assigned to the table results used as reference in subsequent tool calls
+    :param runtime: the runtime (parameter is not visible to the model)
+    :return: the query results and the corresponding artifact data
+    """
+
+    # Define the database.
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{db_name}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+
+    try:
+        # Run query.
+        result = await db.query(query)
+
+        # Parse results.
+        df = pd.DataFrame(result)
+        records = df.to_dict(orient="records")
+
+        # Convert to base64.
+        csv_base64 = base64.b64encode(df.to_csv(index=False, encoding="utf-8").encode("utf-8")).decode("utf-8")
+
+        # Store data in order to not overhead the messages thread.
+        await runtime.store.aput(
+            namespace=("artifacts", runtime.context.thread_id),
+            key=ref_table_name,
+            value={
+                "mime_type": "text/csv",
+                "data": f"data:text/csv;base64,{csv_base64}",
+                "records": records,
+            },
+        )
+
+        if len(df) > 20 or len(df.columns) > 10:
+            content = {
+                "table_name": ref_table_name,
+                "shape": df.shape,
+                "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "data": f"Previewing {min(5, len(df))} rows out of {len(df)} rows: {json.dumps(records[:5])}. "
+                f"Download to view all data.",
+                "truncated": True,
+            }
+            artifact_data = {"table_name": ref_table_name, "mime_type": "text/csv"}
+
+            return content, artifact_data
+        else:
+            content = {
+                "table_name": ref_table_name,
+                "shape": df.shape,
+                "schema": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "data": json.dumps(records),
+                "truncated": False,
+            }
+
+            return content, None
+    finally:
+        await db.disconnect()
+
+
+@tool("create_plot", args_schema=CodePlotInput, response_format="content_and_artifact")
+async def create_plot(
+    code: str, description: str, ref_table_name: str, runtime: ToolRuntime[Context]
+) -> tuple[str, dict | None]:
+    """
+    Executes Python code to create a custom seaborn plot and provide an argumentative related description.
+
+    :param code: Python code using seaborn to create a plot starting from provided data
+    :param description: a brief description of the generated graph
+    :param ref_table_name: the name of the table stored in the store previously generated object to use for this plot
+    :param runtime: the runtime (parameter is not visible to the model)
+    :return: graph description with a Base64 encoded PNG image artifact
+    """
+
+    matplotlib.use("Agg")
+
+    item = await runtime.store.aget(namespace=("artifacts", runtime.context.thread_id), key=ref_table_name)
+
+    if item is None:
+        return f"Table '{ref_table_name}' not found.", None
+
+    df = pd.DataFrame(item.value["records"])
+
+    tree = validate_plot_code(code)
+    compiled = compile(tree, "<plot>", "exec")
+
+    safe_builtins = {
+        "int": int,
+        "float": float,
+        "str": str,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "tuple": tuple,
+        "set": set,
+        "range": range,
+        "enumerate": enumerate,
+        "zip": zip,
+        "len": len,
+        "sum": sum,
+        "min": min,
+        "max": max,
+        "sorted": sorted,
+        "reversed": reversed,
+        "any": any,
+        "all": all,
+        "abs": abs,
+        "round": round,
+    }
+
+    safe_namespace = {
+        "plt": plt,
+        "sns": sns,
+        "np": np,
+        "pd": pd,
+        "df": df,
+        "__builtins__": safe_builtins,
+    }
+
+    def _render_plot() -> bytes:
+        exec(compiled, safe_namespace)
+        buf = BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        _image_bytes = buf.read()
+        buf.close()
+        return _image_bytes
+
+    try:
+        image_bytes = await asyncio.wait_for(asyncio.to_thread(_render_plot), timeout=S.PLOT_EXEC_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        plt.close("all")
+        return "Plot generation timed out", None
+
+    plt.close("all")
+
+    # Assign ad ID to the current file.
+    file_id = str(uuid.uuid4())
+
+    # Store data in order to not overhead the messages thread.
+    await runtime.store.aput(
+        namespace=("artifacts", runtime.context.thread_id),
+        key=file_id,
+        value={
+            "mime_type": "image/png",
+            "data": f"data:image/png;base64,{base64.b64encode(image_bytes).decode('utf-8')}",
+        },
+    )
+
+    # Format the output: content and artifact.
+    content = description
+    artifact_data = {"file_id": file_id, "mime_type": "image/png"}
+
+    return content, artifact_data
+
+
+@tool("download_and_analyze_pdf_from_storage", args_schema=PDFRetrieveInput, response_format="content_and_artifact")
+async def download_and_analyze_pdf_from_storage(
+    file_uri: str, runtime: ToolRuntime[Context]
+) -> tuple[list[dict] | str, dict | None]:
+    """
+    Download and analyze a single PDF file from cloud storage (S3 or GCS).
+
+    :param file_uri: Cloud Storage URI (s3:// or gs://)
+    :param runtime: the runtime (parameter is not visible to the model)
+    :return: the content retrieval information and the corresponding artifact data
+    """
+
+    # Download the file.
+    try:
+        pdf_bytes = await storage_client.download(file_uri, size_limit=S.MAX_ATTACHMENTS_SIZE)
+    except StorageException:
+        return "Something went wrong during the file download", None
+
+    # Assign ad ID to the current file.
+    file_id = str(uuid.uuid4())
+
+    # Store data in order to not overhead the messages thread.
+    await runtime.store.aput(
+        namespace=("artifacts", runtime.context.thread_id),
+        key=file_id,
+        value={
+            "mime_type": "application/pdf",
+            "data": f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}",
+        },
+    )
+
+    # Format the output: content and artifact.
+    if S.CLOUD_PROVIDER == CloudProvider.GCP:
+        content = [
+            {"type": "text", "text": "Briefly describe the content of the file"},
+            {"type": "file", "file_id": file_uri, "mime_type": "application/pdf"},
+        ]
+    elif (
+        S.CLOUD_PROVIDER == CloudProvider.AWS
+    ):  # Not all the models handle multi-modal format inside the ToolMessage (some models only into HumanMessage)
+        content = [
+            {
+                "type": "text",
+                "text": "The document is stored in S3. Direct PDF analysis inside tool messages is not supported on AWS; I have automatically attached it as a document in the next message for analysis.",
+            },
+        ]
+    else:
+        raise ValueError(f"Unsupported cloud provider: {S.CLOUD_PROVIDER}")
+
+    artifact_data = {"file_id": file_id, "mime_type": "application/pdf", "file_uri": file_uri}
+
+    return content, artifact_data
+
+
+@tool("retrieve_information", args_schema=RAGInput, response_format="content")
+async def retrieve_information(query: str, source: Source, runtime: ToolRuntime[Context]) -> str:
     """
     Retrieve relevant information from a knowledge source using a RAG (Retrieval-Augmented Generation) approach.
-    This tool searches a vector store to find content related to a user query. Currently, the supported sources are:
-
-    - `unimatica`: contains information about italian CCNL unimatica contract.
 
     :param query: the query to use for retrieving information from documentation
-    :type query: str
     :param source: the knowledge source to query
-    :type source: Source
     :param runtime: the runtime (the parameter is not visible to the model)
-    :type runtime: ToolRuntime
     :return: the information extracted from the source
-    :rtype: OutputTool
     """
 
-    try:
-        docs = await runtime.context.vector_store.asimilarity_search(query, filter={"source": {"$eq": source.value}})
-        return OutputTool(status="success", content="\n\n".join([doc.page_content for doc in docs]))
-    except Exception as e:
-        return OutputTool(status="error", content=f"Error retrieving information: {e}")
+    # Retrieve the most similar chunks.
+    docs = await runtime.context.vector_store.asimilarity_search(query, filter={"source": {"$eq": source.value}})
+    # Merge most representative chunks together into a unique string.
+    content = "\n\n".join([doc.page_content for doc in docs])
+
+    return content

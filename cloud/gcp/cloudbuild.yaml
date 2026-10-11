@@ -1,0 +1,48 @@
+steps:
+# Build the container image.
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'build-container-image'
+  entrypoint: bash
+  args:
+    - -c
+    - |
+      docker build \
+        --build-arg EXTRAS="gcp" \
+        -t $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
+        --network=cloudbuild \
+        .
+# Push the container image to Artifact Registry.
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-container-image'
+  entrypoint: bash
+  args:
+    - -c
+    - |
+      docker push $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA
+# Deploy container image to Cloud Run.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'deploy-cloud-run'
+  entrypoint: bash
+  args:
+    - -c
+    - |
+      gcloud run deploy chatbot-service \
+          --image $LOCATION-docker.pkg.dev/$PROJECT_ID/ml-servers/$REPO_NAME-server:$SHORT_SHA \
+          --project $PROJECT_ID \
+          --region $LOCATION \
+          --set-env-vars ENVIRONMENT="cloud" \
+          --set-env-vars CLOUD_PROVIDER="gcp" \
+          --set-env-vars COOKIE_SECURE=$_COOKIE_SECURE \
+          --set-env-vars STORAGE_BUCKET=$_STORAGE_BUCKET \
+          --set-env-vars LLM_MODEL=$_LLM_MODEL \
+          --set-env-vars EMBEDDINGS_MODEL=$_EMBEDDINGS_MODEL \
+          --set-env-vars DB_NAME=$_DB_NAME \
+          --set-env-vars INSTANCE_CONNECTION_NAME=$_INSTANCE_CONNECTION_NAME \
+          --set-secrets="DB_USER=postgres_db_username:latest" \
+          --set-secrets="DB_PASSWORD=postgres_db_password:latest" \
+          --set-secrets="SECRET_KEY=auth_key:latest" \
+          --allow-unauthenticated \
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/$SERVICE_ACCOUNT'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1800s

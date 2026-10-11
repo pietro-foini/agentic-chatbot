@@ -16,8 +16,8 @@ jobs:
 
       - name: Install Poetry and dependencies
         run: |
-          pip install -r requirements.txt
-          poetry install --only main,test
+          pip install --no-cache-dir poetry==2.5.1
+          poetry install --all-extras --with test
 
       - name: Run tests
         run: poetry run pytest

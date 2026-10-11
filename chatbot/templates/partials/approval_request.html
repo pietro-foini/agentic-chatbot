@@ -1,0 +1,54 @@
+<div id="approval-box-{{ thread_id }}" class="w-full max-w-4xl mx-auto my-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] dark:bg-amber-500/[0.07] backdrop-blur-md p-4 sm:p-5 shadow-sm shadow-amber-950/5 transition-all">
+    <div class="flex items-center justify-between gap-3 mb-3">
+        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold tracking-wide">
+            <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+            <span>Action Approval Required</span>
+        </div>
+
+        <div id="loader-{{ thread_id }}" class="hidden [&.htmx-request]:inline-flex items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <svg class="animate-spin w-3.5 h-3.5 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span>Processing...</span>
+        </div>
+    </div>
+
+    <div class="relative group rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur p-3.5 mb-4 shadow-inner">
+        <div class="text-xs font-mono leading-relaxed text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap break-words max-h-60 overflow-y-auto selection:bg-amber-500/20">
+{{ approval_info }}
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <button
+            hx-post="/chat/{{ thread_id }}"
+            hx-vals='{"approved": "true"{% if model_name %}, "model_name": "{{ model_name }}"{% endif %}}'
+            hx-target="#approval-box-{{ thread_id }}"
+            hx-swap="outerHTML"
+            hx-indicator="#loader-{{ thread_id }}"
+            hx-disabled-elt="this, button"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-medium shadow-sm shadow-emerald-900/20 transition duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+            <span>Approve</span>
+        </button>
+
+        <button
+            hx-post="/chat/{{ thread_id }}"
+            hx-vals='{"approved": "false", "reason": "Action rejected by user."{% if model_name %}, "model_name": "{{ model_name }}"{% endif %}}'
+            hx-target="#approval-box-{{ thread_id }}"
+            hx-swap="outerHTML"
+            hx-indicator="#loader-{{ thread_id }}"
+            hx-disabled-elt="this, button"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] text-rose-700 dark:text-rose-400 border border-rose-500/20 text-xs font-medium transition duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Reject</span>
+        </button>
+    </div>
+</div>
