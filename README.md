@@ -3,8 +3,14 @@
 Hello there! 😀
 
 This project is an **Agentic Chatbot** built using **LangChain**, **LangGraph**, and **FastAPI**, with **PostgreSQL**
-(enhanced by the `pgvector` extension) as the core data layer for semantic vector search, long-term memory, and
+as the core data layer for semantic vector search, long-term memory, and
 conversation state persistence.
+
+Here’s a quick demo of the chatbot in action:
+
+<p align="center">
+  <img src="assets/example.gif" alt="Demo Chatbot" width="1000" />
+</p>
 
 The application is structured to be cloud-agnostic and modular: it can run fully in a local development environment, or
 be deployed to **Google Cloud Platform (GCP)** and **Amazon Web Services (AWS)**.
