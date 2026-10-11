@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chatbot.api.dependencies import get_login_form, get_register_form, get_session
+from chatbot.api.rate_limit import limit_login_requests, limit_registration_requests
 from chatbot.db.models import UserModel
 from chatbot.errors import FormLoginException, FormRegisterException
 from chatbot.schemas.auth import LoginForm, RegisterForm
@@ -34,9 +35,9 @@ async def register_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="register.html")
 
 
-# TODO: add rate limiter on how many registration can be done
 @auth_router.post(path="/register")
 async def register_form_submit(
+    _: Annotated[None, Depends(limit_registration_requests)],
     session: Annotated[AsyncSession, Depends(get_session)],
     form: Annotated[RegisterForm, Depends(get_register_form)],
 ) -> Response:
@@ -66,9 +67,9 @@ async def register_form_submit(
     return RedirectResponse(url="/login", status_code=303)
 
 
-# TODO: add rate limiter on how many login can be done
 @auth_router.post(path="/login")
 async def login_form_submit(
+    _: Annotated[None, Depends(limit_login_requests)],
     session: Annotated[AsyncSession, Depends(get_session)],
     form: Annotated[LoginForm, Depends(get_login_form)],
 ) -> Response:

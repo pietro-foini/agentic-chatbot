@@ -205,6 +205,18 @@ uvicorn chatbot.main:app --port 8000 --env-file .env --reload
 
 The application will listen on http://localhost:8000.
 
+## Request Limits
+
+Requests are counted in PostgreSQL so limits are shared by all application instances:
+
+- Login: 10 attempts per client IP every 10 minutes.
+- Registration: 5 attempts per client IP every 10 minutes.
+- Chat: 30 requests per authenticated user per minute.
+
+Excess requests receive HTTP `429` with a `Retry-After` header. The limiter table is created by the database setup
+script. For local runs, execute `python -m scripts.setup` with the application environment variables available before
+starting the server; Docker runs the setup script automatically.
+
 ## Docker Deployment
 
 To dockerize the application into a Docker image, we use Docker Compose to manage the database and the application

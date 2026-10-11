@@ -25,6 +25,7 @@ from chatbot.api.dependencies import (
     get_store,
     get_vector_store,
 )
+from chatbot.api.rate_limit import limit_chat_requests
 from chatbot.db.models import ThreadModel, UserModel
 from chatbot.errors import UserFacingError
 from chatbot.graphs.config import ALL_TOOLS, DEFAULT_USER_PREFERENCES
@@ -125,9 +126,9 @@ async def get_chat(
     )
 
 
-# TODO: add rate limiter on how many times can be done
 @chat_router.post(path="/chat/{thread_id}", response_class=HTMLResponse)
 async def process_chat(
+    _: Annotated[None, Depends(limit_chat_requests)],
     request: Request,
     thread_id: Annotated[uuid.UUID, Depends(get_owned_thread)],
     current_user: Annotated[UserModel, Depends(get_current_user)],

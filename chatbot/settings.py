@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, description="Token TTL in minutes")
     COOKIE_SECURE: bool = Field(default=False, description="Set True in production")
 
+    # RATE LIMITING.
+    LOGIN_LIMIT: int = Field(default=10, ge=1, description="Maximum login attempts per IP per auth window")
+    REGISTER_LIMIT: int = Field(default=5, ge=1, description="Maximum registrations per IP per auth window")
+    CHAT_LIMIT: int = Field(default=30, ge=1, description="Maximum chat requests per user per chat window")
+    AUTH_WINDOW_SECONDS: int = Field(default=600, ge=1, description="Rate-limit window for login and registration")
+    CHAT_WINDOW_SECONDS: int = Field(default=60, ge=1, description="Rate-limit window for chat requests")
+
     # STORAGE.
     STORAGE_BUCKET: str = Field(description="Target bucket name for either S3 or GCS")
     STORAGE_ENDPOINT_URL: str = Field(
