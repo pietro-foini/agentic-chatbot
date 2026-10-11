@@ -3,6 +3,7 @@ import base64
 import json
 import uuid
 from io import BytesIO
+from urllib.parse import quote_plus
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ from chatbot.schemas.tools import (
     Source,
     SQLQueryInput,
 )
-from chatbot.settings import CloudProvider, S
+from chatbot.settings import CloudProvider, Environment, S
 from chatbot.storage.config import storage_client
 
 
@@ -40,11 +41,18 @@ async def list_tables(db_name: DBName) -> str:
     """
 
     # Define the database.
-    db = PostgresAsyncHandler(
-        db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
-        readonly=True,
-        statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
-    )
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
 
     try:
         query = """
@@ -69,11 +77,18 @@ async def describe_table(db_name: DBName, table_name: str) -> str:
     """
 
     # Define the database.
-    db = PostgresAsyncHandler(
-        db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
-        readonly=True,
-        statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
-    )
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
 
     try:
         query = """
@@ -102,11 +117,18 @@ async def execute_sql(
     """
 
     # Define the database.
-    db = PostgresAsyncHandler(
-        db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
-        readonly=True,
-        statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
-    )
+    if S.ENVIRONMENT == Environment.CLOUD and S.CLOUD_PROVIDER == CloudProvider.GCP:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql://{S.DB_USER}:{quote_plus(S.DB_PASSWORD.get_secret_value())}@/{S.DB_NAME}?host=/cloudsql/{S.INSTANCE_CONNECTION_NAME}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
+    else:
+        db = PostgresAsyncHandler(
+            db_uri=f"postgresql+asyncpg://{S.DB_USER}:{S.DB_PASSWORD.get_secret_value()}@{S.DB_HOST}:{S.DB_PORT}/{db_name}",
+            readonly=True,
+            statement_timeout_ms=S.SQL_STATEMENT_TIMEOUT_MS,
+        )
 
     try:
         # Run query.
