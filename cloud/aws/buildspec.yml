@@ -10,7 +10,7 @@ phases:
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
   build:
     commands:
-      - docker build -t $ECR_REPO_URI:latest -f Dockerfile .
+      - docker build --build-arg EXTRAS="aws" -t $ECR_REPO_URI:latest -f Dockerfile .
       - docker tag $ECR_REPO_URI:latest $ECR_REPO_URI:$IMAGE_TAG
   post_build:
     commands:
