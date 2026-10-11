@@ -350,7 +350,7 @@ On GCP, secret variables that should not be exposed are managed by the Secret Ma
 - Create three separate secret keys in GCP Secret Manager:
   - `postgres_db_password`
   - `postgres_db_username`
-  - `secret_key`
+  - `auth_key`
 - Populate them.
 
 These variables will be used and configured to the Cloud Run during deployment (see next step and the file `cloud/gcp/cloudbuild.yaml`).
@@ -655,7 +655,7 @@ docker pull $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
 SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id chatbot --region $AWS_REGION --query SecretString --output text)
 export DB_USER=$(echo $SECRET_JSON | jq -r .postgres_db_username)
 export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .postgres_db_password)
-export SECRET_KEY=$(echo $SECRET_JSON | jq -r .secret_key)
+export SECRET_KEY=$(echo $SECRET_JSON | jq -r .auth_key)
 
 # 5. Run the container
 docker run -d \
